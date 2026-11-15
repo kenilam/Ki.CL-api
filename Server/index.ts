@@ -9,7 +9,8 @@ import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
 import cookieParser from 'cookie-parser';
 import { WebSocketServer } from 'ws';
-import { useServer } from 'graphql-ws/use/ws';
+import { useServer, type Extra } from 'graphql-ws/use/ws';
+import type { ConnectionInitMessage, ServerOptions } from 'graphql-ws';
 
 import { schema } from './Schema.js';
 import { createContext, createWsContext, type Context } from './Context/index.js';
@@ -24,6 +25,11 @@ import { connectDatabase, mongoose, pingPrimary } from './DataSources/MongoDB/in
 import { loadTranslations } from 'server/DataSources/MongoDB/translationsCache.js';
 import { createGoogleStorageAssetHandler } from './DataSources/Google/Storage/assetHandler.js';
 import { loadCerts } from './Helpers/certs.js';
+import {
+  authorizeWsOperation,
+  readWsCredentials,
+  wsValidate,
+} from './Helpers/wsAuthorize.js';
 import type { IncomingMessage } from 'node:http';
 
 const PORT = Number(process.env.PORT) || 3100;
@@ -52,8 +58,26 @@ const wsContext = async (ctx: {
 const graphqlWss = new WebSocketServer({ noServer: true });
 const apiWss = new WebSocketServer({ noServer: true });
 
-const graphqlWsCleanup = useServer({ schema, context: wsContext }, graphqlWss);
-const apiWsCleanup = useServer({ schema, context: wsContext }, apiWss);
+/*
+ * The HTTP authenticate middleware never runs on a WebSocket upgrade, so its
+ * rule is applied here instead: wsValidate blocks introspection when it is
+ * off, and onSubscribe requires the kicl_ prefix and a session for every other
+ * operation. Without it the public resolvers answer an unauthenticated socket,
+ * which the HTTP path refuses.
+ */
+const wsServerOptions: ServerOptions<ConnectionInitMessage['payload'], Extra> = {
+  schema,
+  context: wsContext,
+  validate: wsValidate,
+  onSubscribe: (ctx, _id, payload) =>
+    authorizeWsOperation(
+      readWsCredentials({ connectionParams: ctx.connectionParams, request: ctx.extra.request }),
+      payload,
+    ) ?? undefined,
+};
+
+const graphqlWsCleanup = useServer(wsServerOptions, graphqlWss);
+const apiWsCleanup = useServer(wsServerOptions, apiWss);
 
 httpServer.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url ?? '/', 'http://localhost');
