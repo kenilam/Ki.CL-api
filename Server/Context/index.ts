@@ -5,7 +5,8 @@ import { Users, type IUser } from 'server/DataSources/MongoDB/Users/Model.js';
 import { UserTokens } from 'server/DataSources/MongoDB/UserTokens/Model.js';
 import { createAssetLoaders } from 'server/DataSources/MongoDB/Assets/loaders.js';
 import { createTreeOfLifeLoaders } from 'server/DataSources/MongoDB/TreeOfLife/loaders.js';
-import { parseCookies, verifyAccessToken, type TokenPayload } from 'server/Helpers/auth.js';
+import { verifyAccessToken, type TokenPayload } from 'server/Helpers/auth.js';
+import { readWsCredentials } from 'server/Helpers/wsAuthorize.js';
 
 export type AuthenticatedUser = Pick<IUser, 'userGUID' | 'email' | 'active'>;
 
@@ -88,22 +89,7 @@ export async function createWsContext(args: {
 }): Promise<Context> {
   const { connectionParams, request } = args;
 
-  const headerCookie =
-    typeof request?.headers.cookie === 'string' ? request.headers.cookie : undefined;
-  const paramCookie =
-    typeof connectionParams?.cookie === 'string'
-      ? connectionParams.cookie
-      : typeof connectionParams?.Cookie === 'string'
-        ? connectionParams.Cookie
-        : undefined;
-
-  const cookies = parseCookies(headerCookie || paramCookie);
-
-  const accessToken =
-    cookies.access_token ||
-    (typeof connectionParams?.access_token === 'string'
-      ? connectionParams.access_token
-      : undefined);
+  const { accessToken, cookieHeader } = readWsCredentials({ connectionParams, request });
 
   const tokenPayload = verifyAccessToken(accessToken);
   const user = await resolveUser(tokenPayload);
@@ -111,8 +97,8 @@ export async function createWsContext(args: {
   const headers: Record<string, string | string[] | undefined> = {
     ...(request?.headers as Record<string, string | string[] | undefined>),
   };
-  if (headerCookie || paramCookie) {
-    headers.cookie = headerCookie || paramCookie;
+  if (cookieHeader) {
+    headers.cookie = cookieHeader;
   }
 
 
