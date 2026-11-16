@@ -386,6 +386,40 @@ export type MePayload = {
   userGUID?: Maybe<Scalars['UUID']['output']>;
 };
 
+export type Mentorship = {
+  __typename?: 'Mentorship';
+  fetchedAt: Scalars['DateTime']['output'];
+  quotes: Array<MentorshipQuote>;
+  reviews: MentorshipReviews;
+  sessions: Array<MentorshipSession>;
+};
+
+/**
+ * One review as its writer published it. It is someone else's words: show it as
+ * plain text.
+ */
+export type MentorshipQuote = {
+  __typename?: 'MentorshipQuote';
+  organisation?: Maybe<Scalars['String']['output']>;
+  rating: Scalars['Int']['output'];
+  text: Scalars['String']['output'];
+  /** The writer's job title and employer. Their name is not kept. */
+  title?: Maybe<Scalars['String']['output']>;
+  writtenAt: Scalars['DateTime']['output'];
+};
+
+export type MentorshipReviews = {
+  __typename?: 'MentorshipReviews';
+  average: Scalars['Float']['output'];
+  count: Scalars['Int']['output'];
+};
+
+export type MentorshipSession = {
+  __typename?: 'MentorshipSession';
+  minutes: Scalars['Int']['output'];
+  title: Scalars['String']['output'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   activate?: Maybe<Scalars['Boolean']['output']>;
@@ -613,6 +647,14 @@ export type Query = {
   /** The caller's songs that are ready to play, newest first. */
   kineticLightSongs: Array<KineticLightSong>;
   me?: Maybe<MePayload>;
+  /**
+   * The site owner's mentoring record, as their public ADPList profile shows it.
+   *
+   * The profile is read at most once a week and the copy is kept, so a request
+   * never waits on ADPList once there is one. Null when no profile is set or it
+   * has not been read yet.
+   */
+  mentorship?: Maybe<Mentorship>;
   /** The caller's notifications that haven't been dismissed, newest first. */
   notifications: Array<Notification>;
   /** The signed-in user's request that is still waiting or confirmed, so a reloaded page can pick it up. */
@@ -995,6 +1037,10 @@ export type ResolversTypes = ResolversObject<{
   KineticLightStatus: KineticLightStatus;
   KineticLightVoice: KineticLightVoice;
   MePayload: ResolverTypeWrapper<MePayload>;
+  Mentorship: ResolverTypeWrapper<Mentorship>;
+  MentorshipQuote: ResolverTypeWrapper<MentorshipQuote>;
+  MentorshipReviews: ResolverTypeWrapper<MentorshipReviews>;
+  MentorshipSession: ResolverTypeWrapper<MentorshipSession>;
   Mutation: ResolverTypeWrapper<Record<PropertyKey, never>>;
   NonEmptyString: ResolverTypeWrapper<Scalars['NonEmptyString']['output']>;
   Notification: ResolverTypeWrapper<Notification>;
@@ -1056,6 +1102,10 @@ export type ResolversParentTypes = ResolversObject<{
   KineticLightSong: KineticLightSong;
   KineticLightSongInput: KineticLightSongInput;
   MePayload: MePayload;
+  Mentorship: Mentorship;
+  MentorshipQuote: MentorshipQuote;
+  MentorshipReviews: MentorshipReviews;
+  MentorshipSession: MentorshipSession;
   Mutation: Record<PropertyKey, never>;
   NonEmptyString: Scalars['NonEmptyString']['output'];
   Notification: Notification;
@@ -1235,6 +1285,31 @@ export type MePayloadResolvers<ContextType = Context, ParentType extends Resolve
   userGUID?: Resolver<Maybe<ResolversTypes['UUID']>, ParentType, ContextType>;
 }>;
 
+export type MentorshipResolvers<ContextType = Context, ParentType extends ResolversParentTypes['Mentorship'] = ResolversParentTypes['Mentorship']> = ResolversObject<{
+  fetchedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  quotes?: Resolver<Array<ResolversTypes['MentorshipQuote']>, ParentType, ContextType>;
+  reviews?: Resolver<ResolversTypes['MentorshipReviews'], ParentType, ContextType>;
+  sessions?: Resolver<Array<ResolversTypes['MentorshipSession']>, ParentType, ContextType>;
+}>;
+
+export type MentorshipQuoteResolvers<ContextType = Context, ParentType extends ResolversParentTypes['MentorshipQuote'] = ResolversParentTypes['MentorshipQuote']> = ResolversObject<{
+  organisation?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  rating?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  text?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  writtenAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+}>;
+
+export type MentorshipReviewsResolvers<ContextType = Context, ParentType extends ResolversParentTypes['MentorshipReviews'] = ResolversParentTypes['MentorshipReviews']> = ResolversObject<{
+  average?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+}>;
+
+export type MentorshipSessionResolvers<ContextType = Context, ParentType extends ResolversParentTypes['MentorshipSession'] = ResolversParentTypes['MentorshipSession']> = ResolversObject<{
+  minutes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  title?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+}>;
+
 export type MutationResolvers<ContextType = Context, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
   activate?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType, RequireFields<MutationActivateArgs, 'activate'>>;
   contact?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType, RequireFields<MutationContactArgs, 'contact'>>;
@@ -1301,6 +1376,7 @@ export type QueryResolvers<ContextType = Context, ParentType extends ResolversPa
   kineticLightReadings?: Resolver<Array<ResolversTypes['KineticLightReading']>, ParentType, ContextType>;
   kineticLightSongs?: Resolver<Array<ResolversTypes['KineticLightSong']>, ParentType, ContextType>;
   me?: Resolver<Maybe<ResolversTypes['MePayload']>, ParentType, ContextType>;
+  mentorship?: Resolver<Maybe<ResolversTypes['Mentorship']>, ParentType, ContextType>;
   notifications?: Resolver<Array<ResolversTypes['Notification']>, ParentType, ContextType>;
   passwordChange?: Resolver<Maybe<ResolversTypes['PasswordChange']>, ParentType, ContextType>;
   passwordChangeLink?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<QueryPasswordChangeLinkArgs, 'passwordChangeLink'>>;
@@ -1393,6 +1469,10 @@ export type Resolvers<ContextType = Context> = ResolversObject<{
   KineticLightSection?: KineticLightSectionResolvers<ContextType>;
   KineticLightSong?: KineticLightSongResolvers<ContextType>;
   MePayload?: MePayloadResolvers<ContextType>;
+  Mentorship?: MentorshipResolvers<ContextType>;
+  MentorshipQuote?: MentorshipQuoteResolvers<ContextType>;
+  MentorshipReviews?: MentorshipReviewsResolvers<ContextType>;
+  MentorshipSession?: MentorshipSessionResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   NonEmptyString?: GraphQLScalarType;
   Notification?: NotificationResolvers<ContextType>;

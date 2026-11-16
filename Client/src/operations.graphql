@@ -277,6 +277,27 @@ query kicl_me {
   }
 }
 
+query kicl_mentorship {
+  mentorship {
+    reviews {
+      count
+      average
+    }
+    quotes {
+      text
+      rating
+      writtenAt
+      title
+      organisation
+    }
+    sessions {
+      title
+      minutes
+    }
+    fetchedAt
+  }
+}
+
 query kicl_notifications {
   notifications {
     id
