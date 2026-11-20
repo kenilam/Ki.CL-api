@@ -466,6 +466,19 @@ export type Mutation = {
   signIn?: Maybe<Scalars['Boolean']['output']>;
   signOut?: Maybe<Scalars['Boolean']['output']>;
   socialSignIn?: Maybe<Scalars['Boolean']['output']>;
+  /**
+   * The swatch for a colour, `#RRGGBB`. A colour that already has one, or is
+   * having one made, comes back as it is and costs nothing. Otherwise one is
+   * started, counted against the caller's allowance, and kept for everyone.
+   */
+  swatchPick: Swatch;
+  /**
+   * Starts a swatch from a picture: a model finds the colour that defines it and
+   * makes a new photograph in that colour. Answers at once with the swatch as
+   * MAKING. Refused before the picture is read once the caller's allowance is
+   * used up. The picture itself isn't kept.
+   */
+  swatchUpload: Swatch;
   updateMe?: Maybe<Scalars['Boolean']['output']>;
 };
 
@@ -545,6 +558,16 @@ export type MutationSignInArgs = {
 
 export type MutationSocialSignInArgs = {
   socialSignIn: SocialSignInInput;
+};
+
+
+export type MutationSwatchPickArgs = {
+  hex: Scalars['String']['input'];
+};
+
+
+export type MutationSwatchUploadArgs = {
+  file: SwatchFile;
 };
 
 
@@ -661,6 +684,20 @@ export type Query = {
   passwordChange?: Maybe<PasswordChange>;
   /** Whether the emailed link can still be confirmed. Any session may ask: the secret is the proof. */
   passwordChangeLink: Scalars['Boolean']['output'];
+  /** A swatch by its id. */
+  swatch?: Maybe<Swatch>;
+  swatchAllowance: SwatchAllowance;
+  /**
+   * Up to five swatches every visitor sees first, oldest first. The host opens
+   * the one whose colour suits the visitor's light or dark theme.
+   */
+  swatchExamples: Array<Swatch>;
+  /** Every finished swatch, newest first, up to 500, for finding the one nearest a colour. */
+  swatchList: Array<Swatch>;
+  /** Every picked colour that has a swatch, ready or being made, oldest first. */
+  swatchPicks: Array<Swatch>;
+  /** The caller's uploads, newest first, including any still being made. */
+  swatches: Array<Swatch>;
   /**
    * Find taxa by name.
    *
@@ -732,6 +769,11 @@ export type QueryPasswordChangeLinkArgs = {
 };
 
 
+export type QuerySwatchArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type QueryTaxonSearchArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   query: Scalars['String']['input'];
@@ -792,6 +834,8 @@ export type Subscription = {
   notificationUpdated: Notification;
   /** The request's status now and on every change, until it is confirmed or expires. */
   passwordChangeUpdated: PasswordChange;
+  /** Pushes a swatch as each step of making it finishes. */
+  swatchUpdated: Swatch;
   /** Pushes when async studio generation settles (READY, ERROR, or EXHAUSTED). */
   taxonVisualUpdated: TaxonVisual;
 };
@@ -807,8 +851,127 @@ export type SubscriptionPasswordChangeUpdatedArgs = {
 };
 
 
+export type SubscriptionSwatchUpdatedArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
 export type SubscriptionTaxonVisualUpdatedArgs = {
   ottId: Scalars['Int']['input'];
+};
+
+/**
+ * A colour with a name, a photograph in that colour, a looping film of the
+ * photograph and a tone to play with it. Every swatch is kept for good and anyone
+ * can open it. A picked colour is made once and shared. While MAKING, the fields
+ * fill in as each step finishes.
+ */
+export type Swatch = {
+  __typename?: 'Swatch';
+  /**
+   * The film has its own sound, the subject's natural sound, which the page plays
+   * over `tone` when the visitor turns the sound on.
+   */
+  audio: Scalars['Boolean']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  /** Why it failed, in the visitor's language. Null unless FAILED. */
+  failure?: Maybe<Scalars['String']['output']>;
+  /** `#RRGGBB`. Null while an upload is still being read. */
+  hex?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  /** The caller uploaded this swatch. */
+  mine: Scalars['Boolean']['output'];
+  /** The colour's name, in the visitor's language. Null until it's named. */
+  name?: Maybe<Scalars['String']['output']>;
+  source: SwatchSource;
+  /** Null once the swatch is made or has failed. */
+  stage?: Maybe<SwatchStage>;
+  status: SwatchStatus;
+  /** The path of the photograph, also shown in place of the film with reduced motion. */
+  still?: Maybe<Scalars['String']['output']>;
+  tone?: Maybe<SwatchTone>;
+  updatedAt: Scalars['DateTime']['output'];
+  /** The path of the film, an MP4 that loops. */
+  video?: Maybe<Scalars['String']['output']>;
+};
+
+/** New swatches the caller may still make today. */
+export type SwatchAllowance = {
+  __typename?: 'SwatchAllowance';
+  /** One of the caller's swatches is being made. A new one is refused until it ends. */
+  busy: Scalars['Boolean']['output'];
+  limit: Scalars['Int']['output'];
+  /** Set while the caller has to wait before the next one. */
+  nextAllowedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** Also 0 while the service is at its own limit. */
+  remaining: Scalars['Int']['output'];
+};
+
+/** A picture someone uploaded. `data` is its bytes in base64. */
+export type SwatchFile = {
+  data: Scalars['String']['input'];
+};
+
+export enum SwatchMode {
+  Dorian = 'DORIAN',
+  Lydian = 'LYDIAN',
+  Major = 'MAJOR',
+  Minor = 'MINOR',
+  Mixolydian = 'MIXOLYDIAN',
+  Phrygian = 'PHRYGIAN'
+}
+
+/**
+ * Where a swatch's colour came from: a picture the visitor uploaded, or a colour
+ * they picked.
+ */
+export enum SwatchSource {
+  Pick = 'PICK',
+  Upload = 'UPLOAD'
+}
+
+/**
+ * What a swatch being made is busy with: naming the colour and choosing its
+ * scene, drawing the still, then setting the still in motion.
+ */
+export enum SwatchStage {
+  Animating = 'ANIMATING',
+  Drawing = 'DRAWING',
+  Naming = 'NAMING'
+}
+
+export enum SwatchStatus {
+  Failed = 'FAILED',
+  Making = 'MAKING',
+  Ready = 'READY'
+}
+
+/**
+ * The sound the tone is played with: a warm synth pad, clear glassy tones, soft
+ * struck bells, a low sustained hum, or breathy noise around a soft note.
+ */
+export enum SwatchTimbre {
+  Air = 'AIR',
+  Bell = 'BELL',
+  Drone = 'DRONE',
+  Glass = 'GLASS',
+  Pad = 'PAD'
+}
+
+/**
+ * An ambient sound bed for a swatch, chosen by a model for the colour's mood and
+ * played by the browser under the film's own sound. `root` is the MIDI note it rests on, from 36 to 60.
+ * `brightness`, `movement` and `density` run from 0 to 1: how bright it is, how
+ * much it shifts, and how often a new note sounds.
+ */
+export type SwatchTone = {
+  __typename?: 'SwatchTone';
+  brightness: Scalars['Float']['output'];
+  density: Scalars['Float']['output'];
+  mode: SwatchMode;
+  movement: Scalars['Float']['output'];
+  root: Scalars['Int']['output'];
+  timbre: SwatchTimbre;
 };
 
 /**
@@ -1058,6 +1221,15 @@ export type ResolversTypes = ResolversObject<{
   SocialSignInInput: SocialSignInInput;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   Subscription: ResolverTypeWrapper<Record<PropertyKey, never>>;
+  Swatch: ResolverTypeWrapper<Swatch>;
+  SwatchAllowance: ResolverTypeWrapper<SwatchAllowance>;
+  SwatchFile: SwatchFile;
+  SwatchMode: SwatchMode;
+  SwatchSource: SwatchSource;
+  SwatchStage: SwatchStage;
+  SwatchStatus: SwatchStatus;
+  SwatchTimbre: SwatchTimbre;
+  SwatchTone: ResolverTypeWrapper<SwatchTone>;
   TaxonSearchResult: ResolverTypeWrapper<TaxonSearchResult>;
   TaxonSearchSource: TaxonSearchSource;
   TaxonVisual: ResolverTypeWrapper<TaxonVisual>;
@@ -1121,6 +1293,10 @@ export type ResolversParentTypes = ResolversObject<{
   SocialSignInInput: SocialSignInInput;
   String: Scalars['String']['output'];
   Subscription: Record<PropertyKey, never>;
+  Swatch: Swatch;
+  SwatchAllowance: SwatchAllowance;
+  SwatchFile: SwatchFile;
+  SwatchTone: SwatchTone;
   TaxonSearchResult: TaxonSearchResult;
   TaxonVisual: TaxonVisual;
   TaxonVisualScore: TaxonVisualScore;
@@ -1329,6 +1505,8 @@ export type MutationResolvers<ContextType = Context, ParentType extends Resolver
   signIn?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType, RequireFields<MutationSignInArgs, 'signIn'>>;
   signOut?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   socialSignIn?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType, RequireFields<MutationSocialSignInArgs, 'socialSignIn'>>;
+  swatchPick?: Resolver<ResolversTypes['Swatch'], ParentType, ContextType, RequireFields<MutationSwatchPickArgs, 'hex'>>;
+  swatchUpload?: Resolver<ResolversTypes['Swatch'], ParentType, ContextType, RequireFields<MutationSwatchUploadArgs, 'file'>>;
   updateMe?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType, RequireFields<MutationUpdateMeArgs, 'updateMe'>>;
 }>;
 
@@ -1380,6 +1558,12 @@ export type QueryResolvers<ContextType = Context, ParentType extends ResolversPa
   notifications?: Resolver<Array<ResolversTypes['Notification']>, ParentType, ContextType>;
   passwordChange?: Resolver<Maybe<ResolversTypes['PasswordChange']>, ParentType, ContextType>;
   passwordChangeLink?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<QueryPasswordChangeLinkArgs, 'passwordChangeLink'>>;
+  swatch?: Resolver<Maybe<ResolversTypes['Swatch']>, ParentType, ContextType, RequireFields<QuerySwatchArgs, 'id'>>;
+  swatchAllowance?: Resolver<ResolversTypes['SwatchAllowance'], ParentType, ContextType>;
+  swatchExamples?: Resolver<Array<ResolversTypes['Swatch']>, ParentType, ContextType>;
+  swatchList?: Resolver<Array<ResolversTypes['Swatch']>, ParentType, ContextType>;
+  swatchPicks?: Resolver<Array<ResolversTypes['Swatch']>, ParentType, ContextType>;
+  swatches?: Resolver<Array<ResolversTypes['Swatch']>, ParentType, ContextType>;
   taxonSearch?: Resolver<Array<ResolversTypes['TaxonSearchResult']>, ParentType, ContextType, RequireFields<QueryTaxonSearchArgs, 'limit' | 'query'>>;
   taxonVisual?: Resolver<ResolversTypes['TaxonVisual'], ParentType, ContextType, RequireFields<QueryTaxonVisualArgs, 'name' | 'ottId'>>;
   translations?: Resolver<Array<ResolversTypes['Translation']>, ParentType, ContextType, RequireFields<QueryTranslationsArgs, 'namespaces'>>;
@@ -1393,7 +1577,41 @@ export type SubscriptionResolvers<ContextType = Context, ParentType extends Reso
   kineticLightReadingUpdated?: SubscriptionResolver<ResolversTypes['KineticLightReading'], "kineticLightReadingUpdated", ParentType, ContextType>;
   notificationUpdated?: SubscriptionResolver<ResolversTypes['Notification'], "notificationUpdated", ParentType, ContextType>;
   passwordChangeUpdated?: SubscriptionResolver<ResolversTypes['PasswordChange'], "passwordChangeUpdated", ParentType, ContextType, RequireFields<SubscriptionPasswordChangeUpdatedArgs, 'id'>>;
+  swatchUpdated?: SubscriptionResolver<ResolversTypes['Swatch'], "swatchUpdated", ParentType, ContextType, RequireFields<SubscriptionSwatchUpdatedArgs, 'id'>>;
   taxonVisualUpdated?: SubscriptionResolver<ResolversTypes['TaxonVisual'], "taxonVisualUpdated", ParentType, ContextType, RequireFields<SubscriptionTaxonVisualUpdatedArgs, 'ottId'>>;
+}>;
+
+export type SwatchResolvers<ContextType = Context, ParentType extends ResolversParentTypes['Swatch'] = ResolversParentTypes['Swatch']> = ResolversObject<{
+  audio?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  failure?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  hex?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  mine?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  name?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  source?: Resolver<ResolversTypes['SwatchSource'], ParentType, ContextType>;
+  stage?: Resolver<Maybe<ResolversTypes['SwatchStage']>, ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['SwatchStatus'], ParentType, ContextType>;
+  still?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  tone?: Resolver<Maybe<ResolversTypes['SwatchTone']>, ParentType, ContextType>;
+  updatedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  video?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+}>;
+
+export type SwatchAllowanceResolvers<ContextType = Context, ParentType extends ResolversParentTypes['SwatchAllowance'] = ResolversParentTypes['SwatchAllowance']> = ResolversObject<{
+  busy?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  limit?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  nextAllowedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  remaining?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+}>;
+
+export type SwatchToneResolvers<ContextType = Context, ParentType extends ResolversParentTypes['SwatchTone'] = ResolversParentTypes['SwatchTone']> = ResolversObject<{
+  brightness?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  density?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  mode?: Resolver<ResolversTypes['SwatchMode'], ParentType, ContextType>;
+  movement?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  root?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  timbre?: Resolver<ResolversTypes['SwatchTimbre'], ParentType, ContextType>;
 }>;
 
 export type TaxonSearchResultResolvers<ContextType = Context, ParentType extends ResolversParentTypes['TaxonSearchResult'] = ResolversParentTypes['TaxonSearchResult']> = ResolversObject<{
@@ -1481,6 +1699,9 @@ export type Resolvers<ContextType = Context> = ResolversObject<{
   Portfolio?: PortfolioResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   Subscription?: SubscriptionResolvers<ContextType>;
+  Swatch?: SwatchResolvers<ContextType>;
+  SwatchAllowance?: SwatchAllowanceResolvers<ContextType>;
+  SwatchTone?: SwatchToneResolvers<ContextType>;
   TaxonSearchResult?: TaxonSearchResultResolvers<ContextType>;
   TaxonVisual?: TaxonVisualResolvers<ContextType>;
   TaxonVisualScore?: TaxonVisualScoreResolvers<ContextType>;

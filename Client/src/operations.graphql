@@ -329,6 +329,145 @@ query kicl_passwordChangeLink($passwordChangeLink: PasswordChangeConfirmInput!) 
   passwordChangeLink(passwordChangeLink: $passwordChangeLink)
 }
 
+query kicl_swatch($id: ID!) {
+  swatch(id: $id) {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+query kicl_swatchList {
+  swatchList {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+query kicl_swatches {
+  swatches {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+query kicl_swatchPicks {
+  swatchPicks {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+query kicl_swatchExamples {
+  swatchExamples {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+query kicl_swatchAllowance {
+  swatchAllowance {
+    remaining
+    limit
+    nextAllowedAt
+    busy
+  }
+}
+
 query kicl_taxonSearch($query: String!, $limit: Int = 10) {
   taxonSearch(query: $query, limit: $limit) {
     nodeId
@@ -1307,6 +1446,58 @@ mutation kicl_socialSignIn($socialSignIn: SocialSignInInput!) {
   socialSignIn(socialSignIn: $socialSignIn)
 }
 
+mutation kicl_swatchUpload($file: SwatchFile!) {
+  swatchUpload(file: $file) {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
+mutation kicl_swatchPick($hex: String!) {
+  swatchPick(hex: $hex) {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
+  }
+}
+
 mutation kicl_updateMe($updateMe: UpdateMeInput!) {
   updateMe(updateMe: $updateMe)
 }
@@ -1410,6 +1601,32 @@ subscription kicl_passwordChangeUpdated($id: ID!) {
     id
     status
     expiresAt
+  }
+}
+
+subscription kicl_swatchUpdated($id: ID!) {
+  swatchUpdated(id: $id) {
+    id
+    source
+    status
+    stage
+    hex
+    name
+    tone {
+      root
+      mode
+      timbre
+      brightness
+      movement
+      density
+    }
+    still
+    video
+    audio
+    failure
+    mine
+    createdAt
+    updatedAt
   }
 }
 

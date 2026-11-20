@@ -73,3 +73,28 @@ export function buildImageProviders(
 
   return providers;
 }
+
+// Gemini draws 16:9 itself and OpenAI's widest is 3:2. Flux is left out: square only here, and short of photographic.
+export function buildWideImageProviders(
+  prompt: string,
+  geminiModels = resolveGeminiImageModels(),
+): ProviderAttempt<GeneratedImage>[] {
+  return [
+    ...geminiModels.map((model) => ({
+      name: `gemini:${model}`,
+      isConfigured: isGeminiImageConfigured,
+      run: async () => ({
+        buffer: await generateImageGemini(prompt, model, { aspectRatio: '16:9', imageSize: '2K' }),
+        generator: `gemini:${model}`,
+      }),
+    })),
+    {
+      name: 'openai:gpt-image-1',
+      isConfigured: isOpenAiImageConfigured,
+      run: async () => ({
+        buffer: await generateImageOpenAi(prompt, '1536x1024'),
+        generator: 'openai:gpt-image-1',
+      }),
+    },
+  ];
+}

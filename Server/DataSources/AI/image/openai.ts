@@ -36,7 +36,7 @@ export function isOpenAiImageConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
 }
 
-export async function generateImageOpenAi(prompt: string): Promise<Buffer> {
+export async function generateImageOpenAi(prompt: string, size = SIZE): Promise<Buffer> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured');
@@ -51,7 +51,7 @@ export async function generateImageOpenAi(prompt: string): Promise<Buffer> {
     body: JSON.stringify({
       model: MODEL,
       prompt,
-      size: SIZE,
+      size,
       quality: QUALITY,
       n: 1,
     }),
