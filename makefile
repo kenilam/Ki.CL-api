@@ -72,6 +72,23 @@ kinetic-light.migrate:
 kinetic-light.examples:
 	@npx tsx Server/Scripts/kineticLight.ts examples $(IDS)
 
+# Swatch: make swatch.examples HEXES="#1D88BD #2B0A12" makes up to five ready
+# picked colours the examples every visitor sees first. MONGODB_DATABASE picks
+# the database.
+swatch.examples:
+	@npx tsx Server/Scripts/swatch.ts examples $(foreach hex,$(HEXES),'$(hex)')
+
+# make swatch.refilm IDS="<id> <id>" makes those swatches' films again, with
+# their own sound; without IDS, every ready swatch. Each is one more paid film.
+swatch.refilm:
+	@npx tsx Server/Scripts/swatch.ts refilm $(IDS)
+
+# make swatch.resound IDS="<id> <id>" cleans those films' sound again with the
+# current settings, from Gemini's original, and keeps the picture. Nothing is
+# paid for. Films made before originals were kept have to be made again.
+swatch.resound:
+	@npx tsx Server/Scripts/swatch.ts resound $(IDS)
+
 # Contact form: make contact.forget EMAIL=someone@example.com
 # Deletes every message kept under that address, for a deletion request.
 contact.forget:

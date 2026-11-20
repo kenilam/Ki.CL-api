@@ -52,6 +52,7 @@ export function isGeminiImageConfigured(): boolean {
 export async function generateImageGemini(
   prompt: string,
   model: string,
+  imageConfig?: { aspectRatio?: string; imageSize?: string },
 ): Promise<Buffer> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -70,6 +71,7 @@ export async function generateImageGemini(
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ['TEXT', 'IMAGE'],
+        ...(imageConfig ? { imageConfig } : {}),
       },
     }),
   });

@@ -9,6 +9,11 @@ FROM node:24-slim
 
 WORKDIR /src
 
+# Swatch re-encodes Gemini's films, which come out about three times too large.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
 # Yarn 4 comes from the `packageManager` field rather than a bundled release.
 RUN corepack enable
 

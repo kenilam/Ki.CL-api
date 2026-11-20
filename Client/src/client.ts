@@ -57,6 +57,14 @@ function createKiclClient(
     link,
     cache: new InMemoryCache({
       typePolicies: {
+        Query: {
+          fields: {
+            swatch: {
+              read: (_, { args, toReference }) =>
+                toReference({ __typename: 'Swatch', id: args?.id }),
+            },
+          },
+        },
         TreeOfLifeNode: {
           keyFields: ['nodeId'],
         },

@@ -22,6 +22,7 @@ const TIMEOUT_MS = {
   image: 90_000,
   chords: 120_000,
   arrangement: 60_000,
+  video: 240_000,
 } as const;
 
 class ProviderTimeoutError extends Error {}
