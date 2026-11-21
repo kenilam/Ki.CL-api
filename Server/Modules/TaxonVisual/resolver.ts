@@ -8,13 +8,10 @@ import { claimPlate, plateClaimed } from 'server/DataSources/MongoDB/TreeOfLife/
 import { TreeOfLifeNodes } from 'server/DataSources/MongoDB/TreeOfLife/Model.js';
 import { ensureTreeOfLifeNodeByOttId } from 'server/DataSources/MongoDB/TreeOfLife/persist.js';
 import { validate } from 'server/Helpers/Validation/validate.js';
+import { startingWith } from 'server/Helpers/startingWith.js';
 import { TaxonVisualStatus } from 'server/Types/graphql.js';
 import { taxonVisualObjectExists } from './generateImage.js';
-import {
-  sendTaxonVisualUpdated,
-  TAXON_VISUAL_UPDATED,
-  taxonVisualPubSub,
-} from './pubsub.js';
+import { TAXON_VISUAL_UPDATED, taxonVisualPubSub } from './pubsub.js';
 import { toResult, toVisualScore } from './result.js';
 import { startPlate } from './task.js';
 import type { TaxonVisualResult } from './types.js';
@@ -224,31 +221,22 @@ export default {
 
   Subscription: {
     taxonVisualUpdated: {
-      subscribe: withFilter(
-        (_parent, args) => {
-          const ottId = args?.ottId;
-          const iterator = taxonVisualPubSub.asyncIterableIterator(
-            TAXON_VISUAL_UPDATED,
-          );
+      subscribe: (_parent: unknown, args: { ottId: number }, context?: Context) => startingWith(
+        withFilter(
+          () => taxonVisualPubSub.asyncIterableIterator(TAXON_VISUAL_UPDATED),
+          (
+            payload: { taxonVisualUpdated?: TaxonVisualResult } | undefined,
+            variables: { ottId?: number } | undefined,
+          ) => payload?.taxonVisualUpdated?.ottId === variables?.ottId,
+        )(undefined, args, context),
+        async () => {
+          const doc = await TreeOfLifeNodes.findOne({ ottId: args.ottId }).lean();
+          const status = doc?.visualStatus;
 
-          if (typeof ottId === 'number') {
-            void TreeOfLifeNodes.findOne({ ottId }).lean().then((doc) => {
-              if (doc?.visualStatus && SETTLED.includes(doc.visualStatus)) {
-                sendTaxonVisualUpdated(toResult({
-                  ...doc,
-                  ottId,
-                  status: doc.visualStatus,
-                }));
-              }
-            });
-          }
-
-          return iterator;
+          return doc && status && SETTLED.includes(status)
+            ? [{ taxonVisualUpdated: toResult({ ...doc, ottId: args.ottId, status }) }]
+            : [];
         },
-        (
-          payload: { taxonVisualUpdated?: TaxonVisualResult } | undefined,
-          variables: { ottId?: number } | undefined,
-        ) => payload?.taxonVisualUpdated?.ottId === variables?.ottId,
       ),
     },
   },

@@ -10,6 +10,7 @@ import {
   Unauthenticated,
 } from 'server/Errors/index.js';
 import { translate } from 'server/Helpers/translate.js';
+import { startingWith } from 'server/Helpers/startingWith.js';
 import { validate } from 'server/Helpers/Validation/validate.js';
 import { SwatchSource, SwatchStatus } from 'server/Types/graphql.js';
 import { nameFor } from './name.js';
@@ -158,16 +159,23 @@ export default {
   },
   Subscription: {
     swatchUpdated: {
-      subscribe: withFilter(
-        (_parent, _args, context?: Context) => {
-          if (!context) {
-            throw Unauthenticated();
-          }
-          requireOwner(context);
-          return swatchPubSub.asyncIterableIterator(SWATCH_UPDATED);
+      subscribe: (_parent: unknown, args: { id: string }, context?: Context) => startingWith(
+        withFilter(
+          (_parent, _args, context?: Context) => {
+            if (!context) {
+              throw Unauthenticated();
+            }
+            requireOwner(context);
+            return swatchPubSub.asyncIterableIterator(SWATCH_UPDATED);
+          },
+          (payload: { swatchUpdated?: SwatchResult } | undefined, variables: { id?: string } | undefined) =>
+            Boolean(payload?.swatchUpdated && payload.swatchUpdated.id === variables?.id),
+        )(undefined, args, context),
+        async () => {
+          const swatch = Types.ObjectId.isValid(args.id) ? await Swatches.findById(args.id).lean() : null;
+
+          return swatch ? [{ swatchUpdated: toResult(swatch) }] : [];
         },
-        (payload: { swatchUpdated?: SwatchResult } | undefined, variables: { id?: string } | undefined) =>
-          Boolean(payload?.swatchUpdated && payload.swatchUpdated.id === variables?.id),
       ),
     },
   },
