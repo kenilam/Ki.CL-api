@@ -1,5 +1,7 @@
 import { PubSub } from 'graphql-subscriptions';
 
+import { onChange, watchingChanges } from 'server/DataSources/MongoDB/changes.js';
+
 import { KEEP_MS, Notifications, type INotification, type NotificationText } from './Model.js';
 
 export type NotificationResult = ReturnType<typeof toResult>;
@@ -24,8 +26,20 @@ export const notificationPubSub = new PubSub<{
 
 export const NOTIFICATION_UPDATED = 'NOTIFICATION_UPDATED' as const;
 
-export function publish(notification: INotification): void {
+function send(notification: INotification): void {
   void notificationPubSub.publish(NOTIFICATION_UPDATED, { notificationUpdated: toResult(notification) });
+}
+
+// Every instance hears every notification written, so it reaches its owner whichever instance they're on.
+onChange(Notifications.collection.collectionName, (document) => {
+  send(document as INotification);
+});
+
+/** Publishes a write in this process only while the change stream is closed. */
+export function publish(notification: INotification): void {
+  if (!watchingChanges()) {
+    send(notification);
+  }
 }
 
 export function text(key: string, values: NotificationText['values'] = {}): NotificationText {

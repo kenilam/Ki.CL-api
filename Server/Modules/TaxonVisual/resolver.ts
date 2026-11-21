@@ -1,26 +1,24 @@
 import { withFilter } from 'graphql-subscriptions';
-import { Types } from 'mongoose';
 
 import type { Context } from 'server/Context/index.js';
-import { settlePlate, waitForPlate } from 'server/DataSources/MongoDB/settleNotifications.js';
-import { validate } from 'server/Helpers/Validation/validate.js';
-import { TreeOfLifeNodes } from 'server/DataSources/MongoDB/TreeOfLife/Model.js';
-import { TaxonVisualExhaustion, TaxonVisualStatus } from 'server/Types/graphql.js';
-import { ensureTreeOfLifeNodeByOttId } from 'server/DataSources/MongoDB/TreeOfLife/persist.js';
-import { TaxonVisualSchema } from './validation.js';
-import { buildTaxonDescriptionPrompt } from './prompt.js';
-import { taxonVisualObjectExists } from './generateImage.js';
-import { generateTaxonDescription } from './generateDescription.js';
-import { runTaxonVisualPipeline } from './pipeline.js';
 import { anyProviderAvailable } from 'server/DataSources/AI/failover.js';
 import { buildImageProviders } from 'server/DataSources/AI/image/index.js';
-import { ProviderLimitError } from 'server/DataSources/AI/providerLimitError.js';
+import { waitForPlate } from 'server/DataSources/MongoDB/settleNotifications.js';
+import { claimPlate, plateClaimed } from 'server/DataSources/MongoDB/TreeOfLife/claim.js';
+import { TreeOfLifeNodes } from 'server/DataSources/MongoDB/TreeOfLife/Model.js';
+import { ensureTreeOfLifeNodeByOttId } from 'server/DataSources/MongoDB/TreeOfLife/persist.js';
+import { validate } from 'server/Helpers/Validation/validate.js';
+import { TaxonVisualStatus } from 'server/Types/graphql.js';
+import { taxonVisualObjectExists } from './generateImage.js';
 import {
-  publishTaxonVisualUpdated,
+  sendTaxonVisualUpdated,
   TAXON_VISUAL_UPDATED,
   taxonVisualPubSub,
 } from './pubsub.js';
-import type { TaxonVisualResult, TaxonVisualScoreResult } from './types.js';
+import { toResult, toVisualScore } from './result.js';
+import { startPlate } from './task.js';
+import type { TaxonVisualResult } from './types.js';
+import { TaxonVisualSchema } from './validation.js';
 
 /**
  * How many plates a taxon gets before the best one stands.
@@ -31,100 +29,11 @@ import type { TaxonVisualResult, TaxonVisualScoreResult } from './types.js';
  */
 const MAX_VISUAL_ATTEMPTS = 3;
 
-const generatingOttIds = new Set<number>();
-
 const SETTLED: TaxonVisualStatus[] = [
   TaxonVisualStatus.Ready,
   TaxonVisualStatus.Error,
   TaxonVisualStatus.Exhausted,
 ];
-
-/**
- * Whether waiting will help, when generation ran out of quota.
- *
- * Only `BILLING` when every provider is out of credit - one allowance that
- * refills tomorrow is reason enough to wait, and saying otherwise would send
- * someone to a billing page they do not need.
- */
-function exhaustionKind(error: unknown): TaxonVisualExhaustion | null {
-  if (!(error instanceof ProviderLimitError)) {
-    return null;
-  }
-
-  return error.needsBilling ? TaxonVisualExhaustion.Billing : TaxonVisualExhaustion.Refills;
-}
-
-/** Whether an error message is about quota rather than a fault. `studio budget` is in older stored errors. */
-function isQuotaMessage(message: string): boolean {
-  const lower = message.toLowerCase();
-  return ['billing', 'quota', 'studio budget', 'rate limit'].some((word) => lower.includes(word));
-}
-
-function failureStatus(error: unknown): TaxonVisualStatus.Error | TaxonVisualStatus.Exhausted {
-  if (error instanceof ProviderLimitError) {
-    return TaxonVisualStatus.Exhausted;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  return isQuotaMessage(message) ? TaxonVisualStatus.Exhausted : TaxonVisualStatus.Error;
-}
-
-function toVisualScore(
-  score: {
-    overall?: number | null;
-    taxonMatch?: number | null;
-    taxon_match?: number | null;
-    pass?: boolean | null;
-  } | null | undefined,
-): TaxonVisualScoreResult | null {
-  if (!score) {
-    return null;
-  }
-  const overall = score.overall;
-  const taxonMatch = score.taxonMatch ?? score.taxon_match;
-  const pass = score.pass;
-  if (
-    typeof overall !== 'number'
-    || typeof taxonMatch !== 'number'
-    || typeof pass !== 'boolean'
-  ) {
-    return null;
-  }
-  return { overall, taxonMatch, pass };
-}
-
-function toResult(doc: {
-  ottId: number;
-  nodeId?: string | null;
-  description?: string | null;
-  assetId?: unknown;
-  visualStatus?: TaxonVisualStatus | null;
-  visualScore?: TaxonVisualScoreResult | null;
-  visualExhaustion?: TaxonVisualExhaustion | null;
-  status?: TaxonVisualStatus;
-  error?: string | null;
-}): TaxonVisualResult {
-  let status = doc.status ?? doc.visualStatus ?? TaxonVisualStatus.Pending;
-  if (status === TaxonVisualStatus.Error && doc.error && isQuotaMessage(doc.error)) {
-    status = TaxonVisualStatus.Exhausted;
-  }
-
-  return {
-    status,
-    ottId: doc.ottId,
-    nodeId: doc.nodeId ?? null,
-    assetId: doc.assetId != null ? String(doc.assetId) : null,
-    description: doc.description ?? null,
-    visualScore: toVisualScore(doc.visualScore),
-    /*
-     * Only meaningful while the quota is what is stopping us. Carrying it into
-     * a READY result would leave a stale reason attached to a plate that
-     * exists.
-     */
-    exhaustion: status === TaxonVisualStatus.Exhausted
-      ? doc.visualExhaustion ?? TaxonVisualExhaustion.Refills
-      : null,
-  };
-}
 
 async function resolveNode(ottId: number, name: string, rank: string | null) {
   let existing = await TreeOfLifeNodes.findOne({ ottId }).lean();
@@ -160,262 +69,6 @@ async function resolveNode(ottId: number, name: string, rank: string | null) {
   return existing;
 }
 
-async function runGeneration(
-  ottId: number,
-  nodeId: string,
-  name: string,
-  rank: string | null,
-) {
-  if (generatingOttIds.has(ottId)) {
-    return;
-  }
-
-  generatingOttIds.add(ottId);
-
-  try {
-    const {
-      assetId,
-      prompt,
-      description,
-      imageAttempts,
-      imageScore,
-    } = await runTaxonVisualPipeline(ottId, name, rank);
-
-    /*
-     * Only a real review is stored. `scored: false` means no provider ever
-     * looked at the image, and writing numbers for that would put an
-     * unreviewed plate on record as a reviewed one - which is exactly how a
-     * whole library of them came to look approved.
-     */
-    const visualScore = toVisualScore(
-      imageScore?.scored
-        ? {
-            overall: imageScore.overall,
-            taxonMatch: imageScore.taxon_match,
-            pass: imageScore.pass,
-          }
-        : null,
-    );
-
-    console.log(
-      `[TaxonVisual] pipeline ready ottId=${ottId} attempts=${imageAttempts} `
-      + `score=${imageScore?.overall ?? 'n/a'} pass=${imageScore?.pass ?? 'n/a'}`,
-    );
-
-    await TreeOfLifeNodes.findOneAndUpdate(
-      { ottId },
-      {
-        $set: {
-          nodeId,
-          name,
-          rank,
-          prompt,
-          description,
-          assetId: new Types.ObjectId(assetId),
-          visualStatus: TaxonVisualStatus.Ready,
-          visualScore,
-          error: null,
-        },
-        $unset: { imageUrl: 1 },
-      },
-    );
-    publishTaxonVisualUpdated(toResult({
-      ottId,
-      nodeId,
-      description,
-      assetId,
-      visualScore,
-      status: TaxonVisualStatus.Ready,
-    }));
-    await settlePlate(nodeId, TaxonVisualStatus.Ready);
-  } catch (error) {
-    const status = failureStatus(error);
-    const message = error instanceof Error ? error.message : 'Image generation failed';
-    await TreeOfLifeNodes.findOneAndUpdate(
-      { ottId },
-      {
-        $set: {
-          nodeId,
-          name,
-          rank,
-          description: null,
-          visualStatus: status,
-          visualScore: null,
-          visualExhaustion: exhaustionKind(error),
-          error: message,
-        },
-        $unset: { assetId: 1, imageUrl: 1 },
-      },
-    );
-    publishTaxonVisualUpdated(toResult({
-      ottId,
-      nodeId,
-      description: null,
-      assetId: null,
-      visualScore: null,
-      status,
-      error: message,
-    }));
-    await settlePlate(nodeId, status);
-  } finally {
-    generatingOttIds.delete(ottId);
-  }
-}
-
-async function runDescriptionOnly(
-  ottId: number,
-  nodeId: string,
-  name: string,
-  rank: string | null,
-  assetId: string,
-) {
-  if (generatingOttIds.has(ottId)) {
-    return;
-  }
-
-  generatingOttIds.add(ottId);
-
-  try {
-    const description = await generateTaxonDescription(
-      buildTaxonDescriptionPrompt(name, rank),
-    );
-    await TreeOfLifeNodes.findOneAndUpdate(
-      { ottId },
-      { $set: { description } },
-    );
-    publishTaxonVisualUpdated(toResult({
-      ottId,
-      nodeId,
-      description,
-      assetId,
-      status: TaxonVisualStatus.Ready,
-    }));
-  } catch {
-    // Image already READY - keep it; description stays null.
-  } finally {
-    generatingOttIds.delete(ottId);
-  }
-}
-
-/**
- * Failover asset is provisional: try OpenAI only. On success, replace the
- * asset; on failure, keep the existing failover render.
- */
-/**
- * Try again for a plate the reviewer rejected.
- *
- * Was gated on the generator's name: anything not from OpenAI counted as
- * provisional and was re-rendered on every view, forever. That was a stand-in
- * for quality, chosen when the only score available was a fabricated 7 - and a
- * poor one, since it retried good renders as hard as bad ones and stopped
- * retrying a bad OpenAI render entirely. The review score says the thing the
- * vendor name was guessing at, so it is what decides now.
- *
- * The whole chain is used rather than OpenAI alone, so this still works when
- * the preferred provider is out of credit.
- */
-async function runRegeneration(
-  ottId: number,
-  nodeId: string,
-  name: string,
-  rank: string | null,
-  previousAssetId: string,
-  previousDescription: string | null,
-) {
-  if (generatingOttIds.has(ottId)) {
-    return;
-  }
-
-  generatingOttIds.add(ottId);
-
-  try {
-    const {
-      assetId,
-      prompt,
-      description,
-      imageScore,
-    } = await runTaxonVisualPipeline(ottId, name, rank);
-
-    /*
-     * Only a real review is stored. `scored: false` means no provider ever
-     * looked at the image, and writing numbers for that would put an
-     * unreviewed plate on record as a reviewed one - which is exactly how a
-     * whole library of them came to look approved.
-     */
-    const visualScore = toVisualScore(
-      imageScore?.scored
-        ? {
-            overall: imageScore.overall,
-            taxonMatch: imageScore.taxon_match,
-            pass: imageScore.pass,
-          }
-        : null,
-    );
-
-    await TreeOfLifeNodes.findOneAndUpdate(
-      { ottId },
-      {
-        $set: {
-          nodeId,
-          name,
-          rank,
-          prompt,
-          description: description ?? previousDescription,
-          assetId: new Types.ObjectId(assetId),
-          visualStatus: TaxonVisualStatus.Ready,
-          visualScore,
-          error: null,
-        },
-        $inc: { visualAttempts: 1 },
-      },
-    );
-    publishTaxonVisualUpdated(toResult({
-      ottId,
-      nodeId,
-      description: description ?? previousDescription,
-      assetId,
-      visualScore,
-      status: TaxonVisualStatus.Ready,
-    }));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    /*
-     * A failed attempt counts only if something was actually drawn.
-     *
-     * The ceiling exists to stop retrying a taxon the generator cannot render
-     * well - it is a statement about the subject, not about the weather. When
-     * every provider is out of quota nothing was attempted at all, and counting
-     * that would retire taxa for the duration of an outage and never let them
-     * back. Measured: two of one taxon's three attempts were spent this way
-     * before the exhaustion was even visible.
-     */
-    const nothingRendered = error instanceof ProviderLimitError
-      || message.includes('exhausted quota')
-      || message.includes('No image providers configured');
-
-    if (!nothingRendered) {
-      await TreeOfLifeNodes.updateOne({ ottId }, { $inc: { visualAttempts: 1 } });
-    }
-
-    console.warn(
-      `[TaxonVisual] regeneration failed for ottId ${ottId}`
-      + `${nothingRendered ? ' (providers unavailable - attempt not counted)' : ''};`
-      + ` keeping existing asset:`,
-      message,
-    );
-    publishTaxonVisualUpdated(toResult({
-      ottId,
-      nodeId,
-      description: previousDescription,
-      assetId: previousAssetId,
-      status: TaxonVisualStatus.Ready,
-    }));
-  } finally {
-    generatingOttIds.delete(ottId);
-  }
-}
-
 export default {
   Query: {
     taxonVisual: async (
@@ -441,7 +94,8 @@ export default {
       const owner = context.tokenPayload?.userGUID;
       const wait = () => (owner ? waitForPlate(owner, nodeId, resolvedName) : Promise.resolve());
 
-      if (generatingOttIds.has(ottId) || status === TaxonVisualStatus.Pending) {
+      // A plate whose run died lets go of its claim, and is drawn again below.
+      if (status === TaxonVisualStatus.Pending && plateClaimed(existing)) {
         await wait();
 
         return toResult({
@@ -468,14 +122,15 @@ export default {
           const spent = (existing.visualAttempts ?? 0) >= MAX_VISUAL_ATTEMPTS;
 
           if (settled || spent) {
-            if (!existing.description?.trim()) {
-              void runDescriptionOnly(
+            if (!existing.description?.trim() && await claimPlate(ottId)) {
+              await startPlate({
+                step: 'describe',
                 ottId,
                 nodeId,
-                resolvedName,
-                resolvedRank,
+                name: resolvedName,
+                rank: resolvedRank,
                 assetId,
-              );
+              });
             }
             return toResult({
               ottId,
@@ -487,14 +142,17 @@ export default {
             });
           }
 
-          void runRegeneration(
-            ottId,
-            nodeId,
-            resolvedName,
-            resolvedRank,
-            assetId,
-            existing.description ?? null,
-          );
+          if (await claimPlate(ottId)) {
+            await startPlate({
+              step: 'regenerate',
+              ottId,
+              nodeId,
+              name: resolvedName,
+              rank: resolvedRank,
+              assetId,
+              previousDescription: existing.description ?? null,
+            });
+          }
 
           /*
            * `READY`, not `PENDING`: there is a usable plate on screen right
@@ -532,23 +190,24 @@ export default {
         // Fall through to clear status and re-run full pipeline.
       }
 
-      await TreeOfLifeNodes.findOneAndUpdate(
-        { ottId },
-        {
-          $set: {
-            name: resolvedName,
-            rank: resolvedRank,
-            description: null,
-            visualStatus: TaxonVisualStatus.Pending,
-            visualScore: null,
-            error: null,
-          },
-          $unset: { assetId: 1, imageUrl: 1 },
+      const claimed = await claimPlate(ottId, {
+        $set: {
+          name: resolvedName,
+          rank: resolvedRank,
+          description: null,
+          visualStatus: TaxonVisualStatus.Pending,
+          visualScore: null,
+          error: null,
         },
-      );
+        $unset: { assetId: 1, imageUrl: 1 },
+      });
 
       await wait();
-      void runGeneration(ottId, nodeId, resolvedName, resolvedRank);
+
+      // Another request took the plate a moment ago, and its run will tell this visitor too.
+      if (claimed) {
+        await startPlate({ step: 'generate', ottId, nodeId, name: resolvedName, rank: resolvedRank });
+      }
 
       return {
         status: TaxonVisualStatus.Pending,
@@ -575,7 +234,7 @@ export default {
           if (typeof ottId === 'number') {
             void TreeOfLifeNodes.findOne({ ottId }).lean().then((doc) => {
               if (doc?.visualStatus && SETTLED.includes(doc.visualStatus)) {
-                publishTaxonVisualUpdated(toResult({
+                sendTaxonVisualUpdated(toResult({
                   ...doc,
                   ottId,
                   status: doc.visualStatus,

@@ -1,6 +1,6 @@
 import type { IKineticLightReading } from 'server/DataSources/MongoDB/KineticLightReadings/Model.js';
 
-type LeanReading = Pick<
+export type LeanReading = Pick<
   IKineticLightReading,
   | '_id'
   | 'ownerGUID'

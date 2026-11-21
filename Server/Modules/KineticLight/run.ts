@@ -101,3 +101,21 @@ export async function runReading(id: Types.ObjectId, name: string, bytes: Buffer
 
   await save(finish(sheet, model, notes, chords));
 }
+
+/** Ends a read that couldn't start. */
+export async function failReading(id: Types.ObjectId, error: unknown): Promise<void> {
+  console.error(`[KineticLight] ${String(id)} was not started: ${error instanceof Error ? error.message : String(error)}`);
+
+  const reading = await KineticLightReadings
+    .findOneAndUpdate(
+      { _id: id, status: KineticLightStatus.Reading },
+      { ...CLEARED, status: KineticLightStatus.Failed, failure: KineticLightFailure.Unavailable },
+      { new: true },
+    )
+    .lean();
+
+  if (reading) {
+    publishReadingUpdated(toResult(reading));
+    await notifyReading(toResult(reading));
+  }
+}
