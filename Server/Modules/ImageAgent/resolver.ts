@@ -5,6 +5,7 @@ import type { Context } from 'server/Context/index.js';
 import { ImageAgentThreads } from 'server/DataSources/MongoDB/ImageAgentThreads/Model.js';
 import { BadUserInput, CaptchaRequired, NotFound, Unauthenticated } from 'server/Errors/index.js';
 import { translate } from 'server/Helpers/translate.js';
+import { startingWith } from 'server/Helpers/startingWith.js';
 import { validate } from 'server/Helpers/Validation/validate.js';
 import {
   ImageAgentMessageKind,
@@ -234,25 +235,33 @@ export default {
 
   Subscription: {
     imageAgentThreadUpdated: {
-      subscribe: withFilter(
-        (_parent, _args, context?: Context) => {
-          if (!context) {
-            throw Unauthenticated();
-          }
-          requireOwner(context);
-          return imageAgentPubSub.asyncIterableIterator(IMAGE_AGENT_THREAD_UPDATED);
-        },
-        (
-          payload: { imageAgentThreadUpdated?: ImageAgentThreadResult } | undefined,
-          variables: { id?: string } | undefined,
-          context?: Context,
-        ) => {
-          const thread = payload?.imageAgentThreadUpdated;
-          return Boolean(
-            thread
-            && thread.id === variables?.id
-            && thread.ownerGUID === context?.tokenPayload?.userGUID,
-          );
+      subscribe: (_parent: unknown, args: { id: string }, context?: Context) => startingWith(
+        withFilter(
+          (_parent, _args, context?: Context) => {
+            if (!context) {
+              throw Unauthenticated();
+            }
+            requireOwner(context);
+            return imageAgentPubSub.asyncIterableIterator(IMAGE_AGENT_THREAD_UPDATED);
+          },
+          (
+            payload: { imageAgentThreadUpdated?: ImageAgentThreadResult } | undefined,
+            variables: { id?: string } | undefined,
+            context?: Context,
+          ) => {
+            const thread = payload?.imageAgentThreadUpdated;
+            return Boolean(
+              thread
+              && thread.id === variables?.id
+              && thread.ownerGUID === context?.tokenPayload?.userGUID,
+            );
+          },
+        )(undefined, args, context),
+        async () => {
+          const owner = context?.tokenPayload?.userGUID;
+          const thread = owner && Types.ObjectId.isValid(args.id) ? await loadThread(args.id, owner) : null;
+
+          return thread ? [{ imageAgentThreadUpdated: toResult(thread) }] : [];
         },
       ),
     },

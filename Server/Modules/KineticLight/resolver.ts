@@ -12,6 +12,7 @@ import {
   Unavailable,
 } from 'server/Errors/index.js';
 import { translate } from 'server/Helpers/translate.js';
+import { startingWith } from 'server/Helpers/startingWith.js';
 import { validate } from 'server/Helpers/Validation/validate.js';
 import { KineticLightSource, KineticLightStage, KineticLightStatus } from 'server/Types/graphql.js';
 import { arrange } from './arrange.js';
@@ -77,6 +78,9 @@ async function start(ownerGUID: string, name: string) {
     throw error;
   }
 }
+
+// How far back a reconnecting subscriber is caught up on readings that finished.
+const CAUGHT_UP_MS = 30 * 60 * 1000;
 
 export default {
   KineticLightReading: {
@@ -231,22 +235,39 @@ export default {
   },
   Subscription: {
     kineticLightReadingUpdated: {
-      subscribe: withFilter(
-        (_parent, _args, context?: Context) => {
-          if (!context) {
-            throw Unauthenticated();
+      subscribe: (_parent: unknown, args: Record<string, never>, context?: Context) => startingWith(
+        withFilter(
+          (_parent, _args, context?: Context) => {
+            if (!context) {
+              throw Unauthenticated();
+            }
+            requireOwner(context);
+            return kineticLightPubSub.asyncIterableIterator(KINETIC_LIGHT_READING_UPDATED);
+          },
+          (
+            payload: { kineticLightReadingUpdated?: ReadingResult } | undefined,
+            _variables: unknown,
+            context?: Context,
+          ) => Boolean(
+            payload?.kineticLightReadingUpdated
+            && payload.kineticLightReadingUpdated.ownerGUID === context?.tokenPayload?.userGUID,
+          ),
+        )(undefined, args, context),
+        async () => {
+          const owner = context?.tokenPayload?.userGUID;
+
+          if (!owner) {
+            return [];
           }
-          requireOwner(context);
-          return kineticLightPubSub.asyncIterableIterator(KINETIC_LIGHT_READING_UPDATED);
+
+          // What's still being read, and what finished while the caller was away.
+          const readings = await KineticLightReadings.find({
+            ownerGUID: owner,
+            $or: [{ status: KineticLightStatus.Reading }, { updatedAt: { $gte: new Date(Date.now() - CAUGHT_UP_MS) } }],
+          }).lean();
+
+          return readings.map((reading) => ({ kineticLightReadingUpdated: toResult(reading) }));
         },
-        (
-          payload: { kineticLightReadingUpdated?: ReadingResult } | undefined,
-          _variables: unknown,
-          context?: Context,
-        ) => Boolean(
-          payload?.kineticLightReadingUpdated
-          && payload.kineticLightReadingUpdated.ownerGUID === context?.tokenPayload?.userGUID,
-        ),
       ),
     },
   },

@@ -12,6 +12,7 @@ import {
 } from 'server/DataSources/MongoDB/Notifications/notify.js';
 import { settleFor } from 'server/DataSources/MongoDB/settleNotifications.js';
 import { Unauthenticated } from 'server/Errors/index.js';
+import { startingWith } from 'server/Helpers/startingWith.js';
 
 function requireOwner(context?: Context): string {
   const owner = context?.tokenPayload?.userGUID;
@@ -54,14 +55,29 @@ export default {
   },
   Subscription: {
     notificationUpdated: {
-      subscribe: withFilter(
-        (_parent, _args, context?: Context) => {
-          requireOwner(context);
+      subscribe: (_parent: unknown, args: Record<string, never>, context?: Context) => startingWith(
+        withFilter(
+          (_parent, _args, context?: Context) => {
+            requireOwner(context);
 
-          return notificationPubSub.asyncIterableIterator(NOTIFICATION_UPDATED);
-        },
-        (payload: { notificationUpdated?: NotificationResult } | undefined, _variables: unknown, context?: Context) => {
-          return payload?.notificationUpdated?.ownerGUID === context?.tokenPayload?.userGUID;
+            return notificationPubSub.asyncIterableIterator(NOTIFICATION_UPDATED);
+          },
+          (payload: { notificationUpdated?: NotificationResult } | undefined, _variables: unknown, context?: Context) => {
+            return payload?.notificationUpdated?.ownerGUID === context?.tokenPayload?.userGUID;
+          },
+        )(undefined, args, context),
+        async () => {
+          const owner = context?.tokenPayload?.userGUID;
+
+          if (!owner) {
+            return [];
+          }
+
+          const notifications = await Notifications.find({ ownerGUID: owner, dismissedAt: null })
+            .sort({ updatedAt: -1 })
+            .lean<INotification[]>();
+
+          return notifications.map((notification) => ({ notificationUpdated: toResult(notification) }));
         },
       ),
     },
