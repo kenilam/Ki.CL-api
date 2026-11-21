@@ -25,7 +25,9 @@ import { connectDatabase, mongoose, pingPrimary } from './DataSources/MongoDB/in
 import { stopWatchingChanges, watchChanges } from './DataSources/MongoDB/changes.js';
 import { runsRoute } from './DataSources/Google/Tasks/index.js';
 import { runImageAgentTask } from './Modules/ImageAgent/task.js';
+import { runKineticLightTask } from './Modules/KineticLight/task.js';
 import { runSwatchTask } from './Modules/Swatch/task.js';
+import { runTaxonVisualTask } from './Modules/TaxonVisual/task.js';
 import { loadTranslations } from 'server/DataSources/MongoDB/translationsCache.js';
 import { createGoogleStorageAssetHandler } from './DataSources/Google/Storage/assetHandler.js';
 import { loadCerts } from './Helpers/certs.js';
@@ -205,7 +207,12 @@ async function start() {
   ] as const;
 
   // Work that carries on after a request, called by Cloud Tasks (see DataSources/Google/Tasks).
-  app.use('/internal/runs', runsRoute({ 'image-agent': runImageAgentTask, swatch: runSwatchTask }));
+  app.use('/internal/runs', runsRoute({
+    'image-agent': runImageAgentTask,
+    'kinetic-light': runKineticLightTask,
+    swatch: runSwatchTask,
+    'taxon-visual': runTaxonVisualTask,
+  }));
 
   /*
    * ExchangeToken without GraphQL, ahead of the BFF so Apollo doesn't take the

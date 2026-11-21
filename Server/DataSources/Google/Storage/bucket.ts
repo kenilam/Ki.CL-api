@@ -116,6 +116,13 @@ export function getBucketId(): string {
   return bucketId;
 }
 
+/**
+ * Objects under this prefix are never served through the proxy, and a
+ * lifecycle rule on the bucket deletes them a day after they're written.
+ * They're files a visitor sent, kept only while work that needs them runs.
+ */
+export const PRIVATE_PREFIX = 'private/';
+
 export function getStorageProxyPrefix(): string {
   return process.env.GOOGLE_STORAGE_PROXY || '/assets';
 }

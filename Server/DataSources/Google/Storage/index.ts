@@ -2,10 +2,12 @@ export {
   getBucket,
   getBucketId,
   getStorageProxyPrefix,
+  PRIVATE_PREFIX,
   publicObjectPath,
 } from './bucket.js';
 export {
   deleteObject,
+  downloadObject,
   listObjects,
   objectExists,
   uploadBuffer,

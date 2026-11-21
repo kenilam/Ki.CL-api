@@ -20,7 +20,7 @@ import { KINETIC_LIGHT_READING_UPDATED, kineticLightPubSub } from './pubsub.js';
 import { allowanceFor, assertWithinQuota, assertWithinSaveQuota } from './quota.js';
 import { recoverStalled } from './recover.js';
 import { toResult, toSong, type ReadingResult } from './result.js';
-import { runReading } from './run.js';
+import { startReading } from './task.js';
 import { ArrangeSchema, MAX_FILE_BYTES, MAX_FILE_SIZE, ReadSchema, SaveSchema } from './validation.js';
 
 const DUPLICATE_KEY = 11000;
@@ -167,9 +167,7 @@ export default {
 
       await notifyReading(toResult(reading));
 
-      runReading(reading._id, file.name, bytes, mime).catch((error: Error) => {
-        console.error(`[KineticLight] "${file.name}" was not read: ${error.message}`);
-      });
+      await startReading(reading._id, file.name, bytes, mime);
 
       return toResult(reading);
     },
