@@ -15,7 +15,7 @@ import { allowanceFor, assertWithinQuota, normalisePrompt } from './govern/index
 import { notifyThread } from './notify.js';
 import { IMAGE_AGENT_THREAD_UPDATED, imageAgentPubSub } from './pubsub.js';
 import { recoverStalled } from './recover.js';
-import { respond } from './respond.js';
+import { startTurn } from './task.js';
 import { rewindTo } from './rewind.js';
 import { galleryAssets } from './gallery.js';
 import { similarThreads } from './similar.js';
@@ -181,7 +181,7 @@ export default {
       }
 
       await notifyThread(toResult(doc));
-      void respond(id, owner, text);
+      await startTurn(id, owner, text);
 
       return toResult(doc);
     },
@@ -225,7 +225,7 @@ export default {
       }
 
       await notifyThread(toResult(doc));
-      void respond(id, owner, text);
+      await startTurn(id, owner, text);
 
       return toResult(doc);
     },

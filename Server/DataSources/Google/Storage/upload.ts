@@ -40,6 +40,11 @@ export async function listObjects(prefix: string): Promise<string[]> {
   return files.map((file) => file.name);
 }
 
+export async function downloadObject(objectName: string): Promise<Buffer> {
+  const [buffer] = await getBucket().file(objectName).download();
+  return buffer;
+}
+
 export async function deleteObject(objectName: string): Promise<void> {
   await getBucket().file(objectName).delete({ ignoreNotFound: true });
 }

@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import { getBucketForSegment, getBucketId } from './bucket.js';
+import { getBucketForSegment, getBucketId, PRIVATE_PREFIX } from './bucket.js';
 
 /**
  * Authenticated same-origin asset proxy.
@@ -89,6 +89,11 @@ export function createGoogleStorageAssetHandler() {
 
       if (!objectName || objectName.includes('..')) {
         res.status(400).end();
+        return;
+      }
+
+      if (objectName.startsWith(PRIVATE_PREFIX)) {
+        res.status(404).end();
         return;
       }
 

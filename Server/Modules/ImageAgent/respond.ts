@@ -147,6 +147,11 @@ async function failure(threadId: string, jobId: string | null, error: unknown): 
   }));
 }
 
+/** Ends a turn that couldn't start, with the failure line. */
+export async function failTurn(threadId: string, error: unknown): Promise<void> {
+  await failure(threadId, null, error);
+}
+
 function deliveryLine(score: ImageAgentJobScore | null): string {
   if (!score) {
     return translate('api', 'image_agent_drawn_unreviewed');

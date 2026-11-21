@@ -1,5 +1,6 @@
 import { mongo, type Types } from 'mongoose';
 
+import { runLater } from 'server/DataSources/Google/Tasks/index.js';
 import { Swatches } from 'server/DataSources/MongoDB/Swatches/Model.js';
 import { BadUserInput } from 'server/Errors/index.js';
 import { translate } from 'server/Helpers/translate.js';
@@ -8,7 +9,8 @@ import { joinSwatch, notifySwatch } from './notify.js';
 import { assertWithinQuota } from './quota.js';
 import { recoverStalled } from './recover.js';
 import { toResult } from './result.js';
-import { runSwatch, type SwatchInput } from './run.js';
+import { failSwatch, makeSwatch, nameSwatch, type SwatchInput } from './run.js';
+import { runSwatchTask } from './task.js';
 import { MAX_FILE_BYTES, MAX_FILE_SIZE } from './validation.js';
 
 const SIGNATURES: [string, string][] = [
@@ -41,16 +43,21 @@ function isDuplicateHex(error: unknown): boolean {
     && Boolean(error.keyPattern?.hex);
 }
 
+// The picture is read now and dropped, so an upload's task carries only its id.
 async function begin(swatch: Parameters<typeof toResult>[0], input: SwatchInput) {
-  const result = toResult(swatch);
+  const { _id: id } = swatch;
 
-  await notifySwatch(result);
+  await notifySwatch(toResult(swatch));
 
-  runSwatch(swatch._id, input).catch((error: Error) => {
-    console.error(`[Swatch] ${result.id} stopped: ${error.message}`);
-  });
+  if ('image' in input && !(await nameSwatch(id, input))) {
+    return toResult((await Swatches.findById(id).lean()) ?? swatch);
+  }
 
-  return result;
+  const here = 'image' in input ? () => makeSwatch(id) : () => runSwatchTask({ id: String(id) });
+
+  await runLater('swatch', { id: String(id) }, here).catch((error: unknown) => failSwatch(id, error));
+
+  return toResult((await Swatches.findById(id).lean()) ?? swatch);
 }
 
 export async function upload(owner: string, bytes: Buffer) {

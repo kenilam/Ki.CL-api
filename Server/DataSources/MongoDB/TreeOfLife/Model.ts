@@ -55,6 +55,13 @@ export interface ITreeOfLifeNode extends Document {
    * asking later still needs to know whether waiting will help.
    */
   visualExhaustion: TaxonVisualExhaustion | null;
+  /**
+   * Until when a run on this plate holds it. One run at a time, across every
+   * instance; a run that dies lets go when this passes.
+   *
+   * Internal only - not exposed on TreeOfLife GraphQL.
+   */
+  visualRunUntil: Date | null;
   /** Internal only - not exposed on TreeOfLife GraphQL. */
   error: string | null;
   createdAt: Date;
@@ -131,6 +138,10 @@ const TreeOfLifeNodeSchema = new Schema<ITreeOfLifeNode>(
     visualExhaustion: {
       type: String,
       enum: [...Object.values(TaxonVisualExhaustion), null],
+      default: null,
+    },
+    visualRunUntil: {
+      type: Date,
       default: null,
     },
     error: {
