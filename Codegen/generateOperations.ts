@@ -1,5 +1,5 @@
 /**
- * Auto-generate operations.graphql from schema files using @graphql-tools/utils.
+ * Auto-generate operations.graphql from the gateway's public schema using @graphql-tools/utils.
  * Uses buildOperationNodeForField to generate full operations for each
  * query / mutation / subscription. Prefixes all operation names with kicl_
  *
@@ -7,9 +7,7 @@
  */
 import { buildSchema, OperationTypeNode, print } from 'graphql';
 import { buildOperationNodeForField } from '@graphql-tools/utils';
-import { loadFilesSync } from '@graphql-tools/load-files';
-import { mergeTypeDefs } from '@graphql-tools/merge';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import appRoot from 'app-root-path';
 
 const PREFIX = 'kicl_';
@@ -180,10 +178,7 @@ ${descendants}
 }`;
 }
 
-const typeDefs = loadFilesSync(appRoot.resolve('Server/Modules/**/*.graphql'));
-const merged = mergeTypeDefs(typeDefs);
-const schemaStr = print(merged);
-const schema = buildSchema(schemaStr);
+const schema = buildSchema(readFileSync(appRoot.resolve('Codegen/schema.graphql'), 'utf8'));
 
 const operations: string[] = [];
 

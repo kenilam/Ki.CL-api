@@ -1,8 +1,0 @@
-type Mutation {
-  signIn(signIn: SignInInput!): Boolean
-}
-
-input SignInInput {
-  email: EmailAddress!
-  password: String!
-}
