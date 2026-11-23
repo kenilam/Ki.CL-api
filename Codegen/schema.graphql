@@ -1,0 +1,1033 @@
+scalar DateTime
+
+scalar EmailAddress
+
+scalar JWT
+
+scalar UUID
+
+scalar URL
+
+scalar NonEmptyString
+
+scalar AcceptLanguage
+
+scalar JSONObject
+
+type Mutation {
+  activate(activate: ActivateInput!): Boolean
+  """
+  Sends a message to the site's owner and acknowledges it at the sender's address. Needs a session that passed the Turnstile check.
+  """
+  contact(contact: ContactInput!): Boolean
+  deleteMe(deleteMe: DeleteMeInput!): Boolean
+  exchangeToken: Boolean
+  """
+  Say something to the agent. Starts a conversation when `threadId` is not
+  given. Returns as soon as the message is recorded; the reply arrives on
+  ImageAgentThreadUpdated.
+  """
+  imageAgentSend(threadId: ID, text: String!): ImageAgentThread!
+  """
+  Go back to one of the person's messages and ask it again. Everything from
+  that message on leaves the conversation, and the message is sent again.
+  Without `messageId`, the person's last message.
+  """
+  imageAgentRetry(threadId: ID!, messageId: ID): ImageAgentThread!
+  """
+  Starts reading the notes and chord symbols in an image or PDF of sheet music,
+  and answers at once with the reading as READING. KineticLightReadingUpdated
+  pushes it when it's done. A caller has one reading at a time.
+  """
+  kineticLightRead(file: KineticLightFile!): KineticLightReading!
+  """
+  Keeps a MIDI or MusicXML file as a song, so it has a link.
+  """
+  kineticLightSave(song: KineticLightSongInput!): KineticLightReading!
+  """
+  Asks a model to choose how the caller's song starts and to write its drums,
+  from an outline the browser made of it. A song is arranged once: one that
+  already has an arrangement comes back as it is.
+  """
+  kineticLightArrange(id: ID!, outline: KineticLightOutline!): KineticLightReading!
+  """
+  Takes the caller's notifications out of their list, and returns their ids.
+  """
+  notificationsDismiss(ids: [ID!]!): [ID!]!
+  """
+  Checks the current password, keeps the new one hashed, and emails the signed-in user a link to confirm the change.
+  """
+  passwordChangeRequest(passwordChangeRequest: PasswordChangeRequestInput!): PasswordChange!
+  """
+  Called from the emailed link. Any session may call it: the secret is the proof.
+  """
+  passwordChangeConfirm(passwordChangeConfirm: PasswordChangeConfirmInput!): Boolean
+  """
+  Sets the password kept with the request, once it has been confirmed.
+  """
+  passwordChangeComplete(passwordChangeComplete: PasswordChangeCompleteInput!): Boolean
+  refreshToken: Boolean
+  register(register: RegisterInput!): Boolean
+  signIn(signIn: SignInInput!): Boolean
+  signOut: Boolean
+  socialSignIn(socialSignIn: SocialSignInInput!): Boolean
+  """
+  Starts a swatch from a picture: a model finds the colour that defines it and
+  makes a new photograph in that colour. Answers at once with the swatch as
+  MAKING. Refused before the picture is read once the caller's allowance is
+  used up. The picture itself isn't kept.
+  """
+  swatchUpload(file: SwatchFile!): Swatch!
+  """
+  The swatch for a colour, `#RRGGBB`. A colour that already has one, or is
+  having one made, comes back as it is and costs nothing. Otherwise one is
+  started, counted against the caller's allowance, and kept for everyone.
+  """
+  swatchPick(hex: String!): Swatch!
+  updateMe(updateMe: UpdateMeInput!): Boolean
+}
+
+type Asset {
+  id: ID!
+  url: String!
+  """
+  How the asset was produced (e.g. openai:gpt-image-1).
+  Null means manually created / uploaded - not AI-generated.
+  """
+  generator: String
+}
+
+type Query {
+  asset(id: ID!): Asset
+  imageAgentThread(id: ID!): ImageAgentThread
+  """
+  The caller's conversations, most recently active first.
+  """
+  imageAgentThreads(limit: Int): [ImageAgentThread!]!
+  imageAgentAllowance: ImageAgentAllowance!
+  """
+  The caller's conversations that already cover most of what `text` asks for,
+  closest first, at most three. For offering to continue one instead of
+  starting over.
+  """
+  imageAgentSimilar(text: String!): [ImageAgentThread!]!
+  """
+  The best-scored pictures from anyone's conversations, highest first.
+  Only the asset: no text, owner or conversation.
+  At most 24; 12 when `limit` is not given.
+  """
+  imageAgentGallery(limit: Int): [Asset!]!
+  """
+  The caller's sheets still being read, newest first.
+  """
+  kineticLightReadings: [KineticLightReading!]!
+  """
+  The caller's songs that are ready to play, newest first.
+  """
+  kineticLightSongs: [KineticLightSong!]!
+  """
+  The example songs every visitor can play, in the order they were added.
+  """
+  kineticLightExamples: [KineticLightSong!]!
+  kineticLightAllowance: KineticLightAllowance!
+  """
+  A song by its id, for anyone with the link. Null once it has expired.
+  """
+  kineticLightReading(id: ID!): KineticLightReading
+  me: MePayload
+  """
+  The site owner's mentoring record, as their public ADPList profile shows it.
+  
+  The profile is read at most once a week and the copy is kept, so a request
+  never waits on ADPList once there is one. Null when no profile is set or it
+  has not been read yet.
+  """
+  mentorship: Mentorship
+  """
+  The caller's notifications that haven't been dismissed, newest first.
+  """
+  notifications: [Notification!]!
+  """
+  The signed-in user's request that is still waiting or confirmed, so a reloaded page can pick it up.
+  """
+  passwordChange: PasswordChange
+  """
+  Whether the emailed link can still be confirmed. Any session may ask: the secret is the proof.
+  """
+  passwordChangeLink(passwordChangeLink: PasswordChangeConfirmInput!): Boolean!
+  """
+  A swatch by its id.
+  """
+  swatch(id: ID!): Swatch
+  """
+  Every finished swatch, newest first, up to 500, for finding the one nearest a colour.
+  """
+  swatchList: [Swatch!]!
+  """
+  The caller's uploads, newest first, including any still being made.
+  """
+  swatches: [Swatch!]!
+  """
+  Every picked colour that has a swatch, ready or being made, oldest first.
+  """
+  swatchPicks: [Swatch!]!
+  """
+  Up to five swatches every visitor sees first, oldest first. The host opens
+  the one whose colour suits the visitor's light or dark theme.
+  """
+  swatchExamples: [Swatch!]!
+  swatchAllowance: SwatchAllowance!
+  """
+  Find taxa by name.
+  
+  Stored nodes are searched first, since they are the ones already placed in
+  the tree and can be navigated to immediately. Only when nothing is stored
+  does this fall through to Open Tree's name index - so exploring somewhere new
+  still works, and the cost of the remote call is paid only when it buys
+  something.
+  """
+  taxonSearch(query: String!, limit: Int = 10): [TaxonSearchResult!]!
+  taxonVisual(ottId: Int!, name: String!, rank: String): TaxonVisual!
+  """
+  Every string of the namespaces asked for. Each comes from the first language
+  that has it: the request's Accept-Language header in its q order, then
+  `en-US`. A namespace that doesn't exist adds nothing to the answer.
+  
+  Runs without a session: the site needs its words before it can start one,
+  and they are public.
+  """
+  translations(namespaces: [String!]!): [Translation!]!
+  """
+  Subtree from Open Tree of Life (cached in Mongo).
+  `ottId` defaults to 93302 (cellular organisms). `heightLimit` max 3.
+  Warm Mongo rows skip OTOL (known leaf or existing child edges).
+  """
+  treeOfLifeSubtree(ottId: Int, nodeId: String, heightLimit: Int = 3): TreeOfLifeNode
+  """
+  Batch subtree roots in one request. Prefer this over parallel
+  `TreeOfLifeSubtree` calls (auto expand). Results are
+  `[...ottId roots, ...nodeId roots]` (nullable slots on hard miss).
+  Max 16 ids combined. Uses Mongo DataLoader batching + warm-path.
+  """
+  treeOfLifeSubtrees(ottIds: [Int!], nodeIds: [String!], heightLimit: Int = 3): [TreeOfLifeNode]!
+}
+
+"""
+Vision review of a delivered image, 1-10 per criterion.
+"""
+type ImageAgentScore {
+  relevance: Float!
+  quality: Float!
+  styleMatch: Float!
+  composition: Float!
+  overall: Float!
+  pass: Boolean!
+  suggestions: [String!]!
+}
+
+type ImageAgentMessage {
+  id: ID!
+  role: ImageAgentRole!
+  kind: ImageAgentMessageKind!
+  text: String
+  assetId: ID
+  asset: Asset
+  score: ImageAgentScore
+  rejection: ImageAgentRejection
+  exhaustion: ImageAgentExhaustion
+  """
+  Short replies the person can pick instead of typing, on a QUESTION. Picking
+  one sends its text as the next message. Empty when none fit.
+  """
+  choices: [String!]!
+  at: DateTime!
+}
+
+"""
+One conversation with the agent, newest message last.
+"""
+type ImageAgentThread {
+  id: ID!
+  status: ImageAgentThreadStatus!
+  """
+  The agent's current understanding of the picture, once it has one.
+  """
+  brief: String
+  style: ImageAgentStyle
+  """
+  What the agent is doing while THINKING, in a few words, updated as it goes.
+  Null at any other time; while DRAWING the PROGRESS message says it.
+  """
+  activity: String
+  messages: [ImageAgentMessage!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+What the caller may still draw today.
+"""
+type ImageAgentAllowance {
+  remaining: Int!
+  limit: Int!
+  """
+  Set while the caller has to wait before the next message.
+  """
+  nextAllowedAt: DateTime
+  """
+  A turn is running in one of the caller's conversations. A new message is
+  refused until it ends.
+  """
+  busy: Boolean!
+  """
+  The caller's conversations with a turn running, most recent first.
+  """
+  running: [ImageAgentThread!]!
+}
+
+type Subscription {
+  """
+  Pushes the whole conversation on every change.
+  """
+  imageAgentThreadUpdated(id: ID!): ImageAgentThread!
+  """
+  Pushes each of the caller's readings as it fills in and when it finishes.
+  """
+  kineticLightReadingUpdated: KineticLightReading!
+  """
+  Pushes each of the caller's notifications when it's written or dismissed.
+  """
+  notificationUpdated: Notification!
+  """
+  The request's status now and on every change, until it is confirmed or expires.
+  """
+  passwordChangeUpdated(id: ID!): PasswordChange!
+  """
+  Pushes a swatch as each step of making it finishes.
+  """
+  swatchUpdated(id: ID!): Swatch!
+  """
+  Pushes when async studio generation settles (READY, ERROR, or EXHAUSTED).
+  """
+  taxonVisualUpdated(ottId: Int!): TaxonVisual!
+  """
+  Every language's status now, and again whenever one changes.
+  """
+  acceptLanguagesUpdated: [AcceptLanguageStatus!]!
+}
+
+"""
+One bar of drums, one string for each drum with one character for each step:
+`X` an accented hit, `x` a hit, `.` nothing. On the drum machine, `snare` is
+played as a clap. In hand percussion, `kick` is a low conga, `snare` a conga
+slap, `hat` and `openHat` a shaker, `ride` a high bongo, `highTom` a high
+conga, `lowTom` a low bongo, and `crash` a big low conga.
+"""
+type KineticLightPattern {
+  kick: String!
+  snare: String!
+  hat: String!
+  openHat: String!
+  ride: String!
+  lowTom: String!
+  highTom: String!
+}
+
+"""
+Bars `from` to `to`, counted from 1, that share a drum pattern. With no
+`pattern` the drums rest. `fill` replaces the pattern on the section's last bar.
+"""
+type KineticLightSection {
+  from: Int!
+  to: Int!
+  pattern: KineticLightPattern
+  fill: KineticLightPattern
+  """
+  A crash on the section's first beat.
+  """
+  crash: Boolean!
+}
+
+"""
+How a song starts, chosen by a model from the song's outline: the piano, the
+drums, the scene's settings and a drum part in sections. `zoom` runs from 3
+to 20, `hue` from 0 to 1 and `glow` from 0 to 3, as in the player's settings.
+"""
+type KineticLightArrangement {
+  voice: KineticLightVoice!
+  beat: KineticLightBeat!
+  zoom: Float!
+  hue: Float!
+  glow: Float!
+  """
+  The outline's `steps`, which the patterns are written in.
+  """
+  steps: Int!
+  sections: [KineticLightSection!]!
+}
+
+"""
+A chord symbol printed above the staff. `bar` and `beat` count from 1, in quarter notes.
+"""
+type KineticLightChord {
+  bar: Int!
+  beat: Float!
+  symbol: String!
+}
+
+"""
+A song behind a link, kept for 30 days, or for good when it's an example: a
+sheet the API read, or a MIDI or MusicXML file. For a sheet, the notes come
+from the sheet reader and everything else from a vision model. While READING,
+the counts, title, tempo and chords fill in as each reader gets to them, and
+`musicxml` waits for the end. When READY, a field is null, or `chords` empty,
+when its reader failed or found nothing.
+"""
+type KineticLightReading {
+  id: ID!
+  source: KineticLightSource!
+  status: KineticLightStatus!
+  """
+  Null once the reading has finished.
+  """
+  stage: KineticLightStage
+  """
+  Bars the sheet reader found.
+  """
+  bars: Int
+  """
+  Pitched notes the sheet reader found.
+  """
+  notes: Int
+  """
+  Why the read failed, in the visitor's language. Null unless FAILED.
+  """
+  failure: String
+  """
+  The notes on the staff, as MusicXML.
+  """
+  musicxml: String
+  """
+  The MIDI file, in base64.
+  """
+  midi: String
+  """
+  The file's name without its extension, until a reader finds the title.
+  """
+  title: String!
+  """
+  Quarter-note beats per minute.
+  """
+  tempo: Float
+  beatsPerBar: Int
+  chords: [KineticLightChord!]!
+  """
+  Null until the owner has asked a model to arrange the song.
+  """
+  arrangement: KineticLightArrangement
+  """
+  The caller made this song, so they can ask for an arrangement.
+  """
+  mine: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+Sheets the caller may still read today.
+"""
+type KineticLightAllowance {
+  """
+  Also 0 while the service is at its own limit.
+  """
+  remaining: Int!
+  limit: Int!
+  """
+  Set while the caller has to wait before the next read.
+  """
+  nextAllowedAt: DateTime
+  """
+  One of the caller's sheets is being read. A new one is refused until it ends.
+  """
+  busy: Boolean!
+}
+
+"""
+A song in a list, without its notes.
+"""
+type KineticLightSong {
+  id: ID!
+  title: String!
+  source: KineticLightSource!
+  createdAt: DateTime!
+}
+
+type MePayload {
+  userGUID: UUID
+  email: EmailAddress
+  firstName: String
+  lastName: String
+  avatar: String
+  active: Boolean
+  aud: String
+  """
+  The portfolio pieces this user may open. Empty for an anonymous session.
+  """
+  portfolios: [Portfolio!]!
+}
+
+type MentorshipReviews {
+  count: Int!
+  average: Float!
+}
+
+"""
+One review as its writer published it. It is someone else's words: show it as
+plain text.
+"""
+type MentorshipQuote {
+  text: String!
+  rating: Int!
+  writtenAt: DateTime!
+  """
+  The writer's job title and employer. Their name is not kept.
+  """
+  title: String
+  organisation: String
+}
+
+type MentorshipSession {
+  title: String!
+  minutes: Int!
+}
+
+type Mentorship {
+  reviews: MentorshipReviews!
+  quotes: [MentorshipQuote!]!
+  sessions: [MentorshipSession!]!
+  fetchedAt: DateTime!
+}
+
+"""
+Words translated where they're shown: an i18next key in the host's `common`
+namespace, or `api:` and a key in the API's, with the values it takes.
+"""
+type NotificationText {
+  key: String!
+  values: JSONObject!
+}
+
+"""
+Work that carries on after its page is left: a sheet reading, an image agent
+turn, a Tree of Life plate or a password change. There is one for each record
+a visitor is told about, written again at each step. The site links it from
+`collection`, the record's Mongo collection, and `documentId`.
+"""
+type Notification {
+  id: ID!
+  collection: String!
+  documentId: String!
+  title: NotificationText!
+  message: NotificationText!
+  dismissedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PasswordChange {
+  id: ID!
+  status: PasswordChangeStatus!
+  expiresAt: DateTime!
+}
+
+type Portfolio {
+  portfolioGUID: UUID
+  path: String
+}
+
+"""
+An ambient sound bed for a swatch, chosen by a model for the colour's mood and
+played by the browser under the film's own sound. `root` is the MIDI note it rests on, from 36 to 60.
+`brightness`, `movement` and `density` run from 0 to 1: how bright it is, how
+much it shifts, and how often a new note sounds.
+"""
+type SwatchTone {
+  root: Int!
+  mode: SwatchMode!
+  timbre: SwatchTimbre!
+  brightness: Float!
+  movement: Float!
+  density: Float!
+}
+
+"""
+A colour with a name, a photograph in that colour, a looping film of the
+photograph and a tone to play with it. Every swatch is kept for good and anyone
+can open it. A picked colour is made once and shared. While MAKING, the fields
+fill in as each step finishes.
+"""
+type Swatch {
+  id: ID!
+  source: SwatchSource!
+  status: SwatchStatus!
+  """
+  Null once the swatch is made or has failed.
+  """
+  stage: SwatchStage
+  """
+  `#RRGGBB`. Null while an upload is still being read.
+  """
+  hex: String
+  """
+  The colour's name, in the visitor's language. Null until it's named.
+  """
+  name: String
+  tone: SwatchTone
+  """
+  The path of the photograph, also shown in place of the film with reduced motion.
+  """
+  still: String
+  """
+  The path of the film, an MP4 that loops.
+  """
+  video: String
+  """
+  The film has its own sound, the subject's natural sound, which the page plays
+  over `tone` when the visitor turns the sound on.
+  """
+  audio: Boolean!
+  """
+  Why it failed, in the visitor's language. Null unless FAILED.
+  """
+  failure: String
+  """
+  The caller uploaded this swatch.
+  """
+  mine: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""
+New swatches the caller may still make today.
+"""
+type SwatchAllowance {
+  """
+  Also 0 while the service is at its own limit.
+  """
+  remaining: Int!
+  limit: Int!
+  """
+  Set while the caller has to wait before the next one.
+  """
+  nextAllowedAt: DateTime
+  """
+  One of the caller's swatches is being made. A new one is refused until it ends.
+  """
+  busy: Boolean!
+}
+
+"""
+A taxon matching a search, from whichever source could answer.
+
+Both sources yield a `nodeId`, so a result navigates the same way wherever it
+came from. A stored node has one recorded; a name matched against Open Tree's
+taxonomy has it derived from the ott id, which is the same thing - the
+synthetic tree names taxon nodes `ott` followed by their ott id.
+"""
+type TaxonSearchResult {
+  nodeId: String
+  ottId: Int
+  name: String!
+  rank: String
+  """
+  Where the match came from, so the client can say so if it wants.
+  """
+  source: TaxonSearchSource!
+}
+
+"""
+Vision QA scores from the studio generate pipeline.
+"""
+type TaxonVisualScore {
+  overall: Float!
+  taxonMatch: Float!
+  pass: Boolean!
+}
+
+"""
+Studio generation signal only. Persist image/description on tree-of-life;
+clients refetch TreeOfLifeSubtree for the node after settle.
+"""
+type TaxonVisual {
+  status: TaxonVisualStatus!
+  ottId: Int!
+  nodeId: String
+  assetId: ID
+  description: String
+  visualScore: TaxonVisualScore
+  """
+  Set only when status is EXHAUSTED.
+  """
+  exhaustion: TaxonVisualExhaustion
+}
+
+"""
+One string of the site's writing.
+"""
+type Translation {
+  namespace: String!
+  """
+  The string's path in its namespace, joined with dots: `account.signOut`.
+  """
+  field: String!
+  value: String!
+}
+
+"""
+Whether a language can be shown yet.
+"""
+type AcceptLanguageStatus {
+  acceptLanguage: AcceptLanguage!
+  """
+  Every `en-US` string is in this language. Only a complete language can be picked or answered in.
+  """
+  complete: Boolean!
+  """
+  `make translations.translate` is working on this language now.
+  """
+  translating: Boolean!
+}
+
+"""
+Flat OTOL + studio node. Tree edges are nodeId-only, parent-pointer style:
+`ancestor` ← the node's own ancestorNodeId (shallow stitch by DataLoader),
+`descendants` ← a live reverse lookup (`{ ancestorNodeId: nodeId }`, batched).
+Nothing is stored forward on the parent. Studio image via `asset` ← assetId.
+"""
+type TreeOfLifeNode {
+  nodeId: String!
+  """
+  OTOL taxonomy id - an attribute/lookup key, not a relationship. Missing on some unnamed / synthetic nodes.
+  """
+  ottId: Int
+  name: String
+  rank: String
+  """
+  Parent node, stitched from this node's own ancestorNodeId. Null for the root (no OTOL parent).
+  """
+  ancestor: TreeOfLifeNode
+  descendants: [TreeOfLifeNode!]
+  """
+  OTOL tip count for this clade. `0` means a known leaf (do not expand).
+  At height cutoffs, children may be omitted while numTips stays > 0.
+  """
+  numTips: Int
+  assetId: ID
+  asset: Asset
+  description: String
+  visualStatus: TaxonVisualStatus
+  """
+  Studio vision QA for the current asset, when generated.
+  """
+  visualScore: TaxonVisualScore
+}
+
+enum ImageAgentRole {
+  USER
+  AGENT
+}
+
+enum ImageAgentMessageKind {
+  TEXT
+  """
+  The agent needs one more thing before it draws.
+  """
+  QUESTION
+  """
+  Turned away by the governor. See `rejection`; `text` says why.
+  """
+  REFUSAL
+  """
+  The agent is drawing; `text` says what it is doing right now.
+  """
+  PROGRESS
+  """
+  A finished picture: `asset` and `score`.
+  """
+  IMAGE
+  """
+  The drawing did not finish. `text` says why; see `exhaustion`.
+  """
+  FAILURE
+}
+
+enum ImageAgentThreadStatus {
+  """
+  Waiting on the person.
+  """
+  IDLE
+  """
+  Reading the last message.
+  """
+  THINKING
+  DRAWING
+}
+
+"""
+Why the governor turned a request away.
+"""
+enum ImageAgentRejection {
+  UNSAFE_SEXUAL
+  UNSAFE_VIOLENT
+  UNSAFE_OTHER
+  """
+  Not about a picture: gibberish, tests, or instructions aimed at the model.
+  """
+  SPAM
+}
+
+"""
+Whether waiting helps, after a FAILURE for quota. `REFILLS` means at least
+one provider's allowance comes back on a timer; `BILLING` means every one is
+out of credit.
+"""
+enum ImageAgentExhaustion {
+  REFILLS
+  BILLING
+}
+
+enum ImageAgentStyle {
+  PHOTOGRAPHY
+  ILLUSTRATION
+  MINIMAL
+  RENDER_3D
+}
+
+enum KineticLightVoice {
+  GRAND
+  SIXTEEN
+  UPRIGHT
+  WURLITZER
+  SYNTH
+}
+
+"""
+The drums a song starts with: none, the acoustic kit, the same kit recorded
+lo-fi, hand percussion, or the LinnDrum and TR-808 drum machines.
+"""
+enum KineticLightBeat {
+  NONE
+  KIT
+  LOFI
+  PERCUSSION
+  LINNDRUM
+  MACHINE
+}
+
+"""
+Where a song came from: a sheet the API read, or a MIDI or MusicXML file.
+"""
+enum KineticLightSource {
+  SHEET
+  FILE
+}
+
+enum KineticLightStatus {
+  READING
+  READY
+  FAILED
+}
+
+"""
+What a reading is busy with: the notes on the staff, then the chord symbols.
+"""
+enum KineticLightStage {
+  NOTES
+  CHORDS
+}
+
+enum PasswordChangeStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+}
+
+enum Provider {
+  google
+  apple
+}
+
+"""
+Where a swatch's colour came from: a picture the visitor uploaded, or a colour
+they picked.
+"""
+enum SwatchSource {
+  UPLOAD
+  PICK
+}
+
+enum SwatchStatus {
+  MAKING
+  READY
+  FAILED
+}
+
+"""
+What a swatch being made is busy with: naming the colour and choosing its
+scene, drawing the still, then setting the still in motion.
+"""
+enum SwatchStage {
+  NAMING
+  DRAWING
+  ANIMATING
+}
+
+enum SwatchMode {
+  MAJOR
+  MINOR
+  LYDIAN
+  DORIAN
+  PHRYGIAN
+  MIXOLYDIAN
+}
+
+"""
+The sound the tone is played with: a warm synth pad, clear glassy tones, soft
+struck bells, a low sustained hum, or breathy noise around a soft note.
+"""
+enum SwatchTimbre {
+  PAD
+  GLASS
+  BELL
+  DRONE
+  AIR
+}
+
+enum TaxonSearchSource {
+  """
+  Already known - matched against stored nodes.
+  """
+  DATABASE
+  """
+  Matched against Open Tree's taxonomy because nothing was stored.
+  """
+  OPEN_TREE
+}
+
+enum TaxonVisualStatus {
+  PENDING
+  READY
+  ERROR
+  EXHAUSTED
+}
+
+"""
+Why generation is out of quota, when status is EXHAUSTED.
+
+`REFILLS` - at least one provider's allowance returns on a timer, so waiting
+works. `BILLING` - every provider is out of credit, and only paying changes
+that. The difference decides whether telling someone to try again later is
+true.
+"""
+enum TaxonVisualExhaustion {
+  REFILLS
+  BILLING
+}
+
+input ActivateInput {
+  registrationGUID: UUID!
+  secret: String!
+  userGUID: UUID!
+}
+
+input ContactInput {
+  email: EmailAddress!
+  message: String!
+}
+
+input DeleteMeInput {
+  currentPassword: String!
+}
+
+"""
+The attached image or PDF. `data` is its bytes in base64. `name` is the file's
+name: the song's title until the reader finds one, and a hint for finding it.
+The name itself isn't kept.
+"""
+input KineticLightFile {
+  name: NonEmptyString!
+  data: String!
+}
+
+"""
+A MIDI or MusicXML file the browser has read, to keep behind a link, with the
+title the browser read from it: `midi` is the MIDI file in base64, `musicxml`
+the MusicXML text. Give one of them.
+"""
+input KineticLightSongInput {
+  title: NonEmptyString!
+  midi: String
+  musicxml: String
+}
+
+"""
+What a model is told about a song so it can arrange it. `steps` is how many
+steps a beat is split into: 2 for eighth notes, 3 for triplets, 4 for
+sixteenths. `bars` has one string for each bar, with one character for each
+step: `b` where a note below middle C starts, `x` where another note starts,
+and `.` where none does.
+"""
+input KineticLightOutline {
+  title: NonEmptyString!
+  """
+  Quarter-note beats per minute.
+  """
+  tempo: Float!
+  beatsPerBar: Int!
+  steps: Int!
+  bars: [String!]!
+}
+
+input PasswordChangeRequestInput {
+  currentPassword: String!
+  password: String!
+}
+
+input PasswordChangeConfirmInput {
+  id: ID!
+  secret: String!
+}
+
+input PasswordChangeCompleteInput {
+  id: ID!
+}
+
+input RegisterInput {
+  email: EmailAddress!
+  password: String!
+  firstName: String
+  lastName: String
+}
+
+input SignInInput {
+  email: EmailAddress!
+  password: String!
+}
+
+input SocialSignInInput {
+  provider: Provider!
+  token: String!
+}
+
+"""
+A picture someone uploaded. `data` is its bytes in base64.
+"""
+input SwatchFile {
+  data: String!
+}
+
+input UpdateMeInput {
+  firstName: String
+  lastName: String
+}

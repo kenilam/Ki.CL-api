@@ -43,3 +43,5 @@ Server/.secret/
 
 # Legacy local taxon visuals (now stored in GCS)
 Server/Assets/TaxonVisuals/
+.registry/
+.registry-local/

@@ -1,4 +1,4 @@
-# Backend image for Cloud Run.
+# Gateway image for Cloud Run.
 #
 # Codegen and the client bundle are built here rather than at boot. The
 # `production` script does all three in sequence, which would repeat a minute of
@@ -8,11 +8,6 @@
 FROM node:24-slim
 
 WORKDIR /src
-
-# Swatch re-encodes Gemini's films, which come out about three times too large.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg \
-  && rm -rf /var/lib/apt/lists/*
 
 # Yarn 4 comes from the `packageManager` field rather than a bundled release.
 RUN corepack enable
@@ -34,8 +29,8 @@ RUN yarn install --immutable
 
 COPY . .
 
-# `Server/Types/graphql.ts` and `Client/src/generated` are generated, not
-# committed, so the server cannot start without this having run.
+# `Client/src/generated` comes from Codegen/schema.graphql, the gateway's public
+# schema, which `make schema` refreshes from the registry.
 RUN yarn codegen \
   && yarn workspace @ki-cl/client run build
 

@@ -1,8 +1,0 @@
-type Mutation {
-  updateMe(updateMe: UpdateMeInput!): Boolean
-}
-
-input UpdateMeInput {
-  firstName: String
-  lastName: String
-}
