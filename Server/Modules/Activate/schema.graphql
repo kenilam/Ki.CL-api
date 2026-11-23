@@ -1,9 +1,0 @@
-type Mutation {
-  activate(activate: ActivateInput!): Boolean
-}
-
-input ActivateInput {
-  registrationGUID: UUID!
-  secret: String!
-  userGUID: UUID!
-}

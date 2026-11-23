@@ -47,106 +47,21 @@ start:
 	yarn install && yarn run start
 	@echo ✅ done
 
-# Portfolio access: make portfolio.grant PIECE=moonshot EMAIL=someone@example.com
-# MONGODB_DATABASE=production picks the production database.
-portfolio.grant:
-	@npx tsx Server/Scripts/portfolioAccess.ts grant "$(PIECE)" "$(EMAIL)"
+REGISTRY ?= ki-cl-registry
 
-portfolio.revoke:
-	@npx tsx Server/Scripts/portfolioAccess.ts revoke "$(PIECE)" "$(EMAIL)"
+# Writes Codegen/schema.graphql, the gateway's public schema, from the services
+# published to REGISTRY (production by default). Run it, then `make codegen`,
+# when a service publishes a field the client needs.
+schema:
+	@rm -rf .registry && mkdir -p .registry/services
+	@gcloud storage cp -q "gs://$(REGISTRY)/services/*.json" .registry/services/
+	npx tsx Server/Scripts/schema.ts ./.registry
 
-portfolio.list:
-	@npx tsx Server/Scripts/portfolioAccess.ts list "$(PIECE)"
+CORE ?= ../Ki.CL-core
 
-# One naming for the database: snake_case plural collections and camelCase
-# fields. Safe to run again. MONGODB_DATABASE picks the database.
-mongo.naming:
-	@npx tsx Server/Scripts/naming.ts
-
-# Kinetic Light songs: make kinetic-light.migrate brings every song to the
-# current shape, then make kinetic-light.examples IDS="<id> <id>" makes songs
-# examples every visitor can play. MONGODB_DATABASE picks the database.
-kinetic-light.migrate:
-	@npx tsx Server/Scripts/kineticLight.ts migrate
-
-kinetic-light.examples:
-	@npx tsx Server/Scripts/kineticLight.ts examples $(IDS)
-
-# Swatch: make swatch.examples HEXES="#1D88BD #2B0A12" makes up to five ready
-# picked colours the examples every visitor sees first. MONGODB_DATABASE picks
-# the database.
-swatch.examples:
-	@npx tsx Server/Scripts/swatch.ts examples $(foreach hex,$(HEXES),'$(hex)')
-
-# make swatch.refilm IDS="<id> <id>" makes those swatches' films again, with
-# their own sound; without IDS, every ready swatch. Each is one more paid film.
-swatch.refilm:
-	@npx tsx Server/Scripts/swatch.ts refilm $(IDS)
-
-# make swatch.resound IDS="<id> <id>" cleans those films' sound again with the
-# current settings, from Gemini's original, and keeps the picture. Nothing is
-# paid for. Films made before originals were kept have to be made again.
-swatch.resound:
-	@npx tsx Server/Scripts/swatch.ts resound $(IDS)
-
-# Contact form: make contact.forget EMAIL=someone@example.com
-# Deletes every message kept under that address, for a deletion request.
-contact.forget:
-	@npx tsx Server/Scripts/contactMessages.ts forget "$(EMAIL)"
-
-# The site's writing: make translations.seed DIR=../Ki.CL/App/locales
-# The server's own messages and emails: make translations.seed DIR=Server/locales
-# Reads <DIR>/en-US/<namespace>.json into one row for each string. seed
-# adds and changes strings, diff fails when the database is behind the files,
-# prune removes strings the files no longer have, drop removes a whole namespace.
-translations.seed:
-	@npx tsx Server/Scripts/translations.ts seed "$(DIR)"
-
-translations.diff:
-	@npx tsx Server/Scripts/translations.ts diff "$(DIR)"
-
-translations.prune:
-	@npx tsx Server/Scripts/translations.ts prune "$(DIR)"
-
-translations.drop:
-	@npx tsx Server/Scripts/translations.ts drop "$(NAMESPACE)"
-
-# Translates the en-US strings that are new or changed into every other
-# locale, or the ones named: make translations.translate LANGUAGES="fr ja".
-# Run it after seeding. A string that fails is reported and tried again next run.
-translations.translate:
-	@npx tsx Server/Scripts/translations.ts translate $$LANGUAGES
-
-# The languages the site is translated into, one row of `locales` each. TAG and
-# PROMPT reach the script through the environment, so nothing in them runs as
-# shell. `seed` writes the languages the site started with.
-#   make locales.add TAG=it-CH PROMPT="An optional note for the translation prompt."
-#   make locales.remove TAG=it-CH
-locales.list:
-	@npx tsx Server/Scripts/locales.ts list
-
-locales.seed:
-	@npx tsx Server/Scripts/locales.ts seed
-
-locales.add:
-	@npx tsx Server/Scripts/locales.ts add "$$TAG" "$$PROMPT"
-
-locales.remove:
-	@npx tsx Server/Scripts/locales.ts remove "$$TAG"
-
-# Renames language to accept-language (en becomes en-US). Run it before the first
-# seed of a release, and with FINISH=--finish a release later.
-translations.migrate:
-	@npx tsx Server/Scripts/translations.ts migrate $(FINISH)
-
-# Every repo's namespaces at once. The other repos are checked out beside this
-# one; name other folders with TRANSLATION_DIRS="a b".
-#   make translations.seed.all                               the development database
-#   MONGODB_DATABASE=production make translations.seed.all   production
-TRANSLATION_DIRS ?= Server/locales ../Ki.CL/App/locales ../Ki.CL-design-system/Design/src/locales ../Ki.CL-moonshot-exercise/Client/src/locales
-
-translations.seed.all:
-	@for dir in $(TRANSLATION_DIRS); do npx tsx Server/Scripts/translations.ts seed "$$dir" || exit 1; done
-
-translations.diff.all:
-	@for dir in $(TRANSLATION_DIRS); do npx tsx Server/Scripts/translations.ts diff "$$dir" || exit 1; done
+# Points the local gateway at a local core on port 3110: run core with
+# `PORT=3110 make run`, then this, then `make run` here.
+registry.local:
+	@mkdir -p .registry-local/services
+	@cd $(CORE) && npx tsx Server/Scripts/registry.ts sdl | jq -Rs '{name: "core", url: "http://localhost:3110/api", sdl: .}' > $(CURDIR)/.registry-local/services/core.json
+	@echo "wrote .registry-local/services/core.json"
