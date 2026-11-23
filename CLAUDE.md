@@ -29,7 +29,7 @@ Ki.CL-api is the gateway in front of the site's GraphQL services, and it serves 
 
 ## Client
 
-`Client/` is `@ki-cl/client`, a React 19 and Apollo Client package built with Vite and exposed through Module Federation. `./client` exports `Provider`, `getClient`, the typed documents and Apollo's hooks; `./provider` keeps the old names (`KiclProvider`, `getKiclClient`) for one release and then goes.
+`Client/` is `@ki-cl/client`, a React 19 and Apollo Client package built with Vite and exposed through Module Federation. `./client` exports `Provider`, `getClient`, the typed documents and Apollo's hooks.
 
 The documents are generated from `Codegen/schema.graphql`, the gateway's public schema, which is committed so CI can build without the registry. When a service publishes a field the client needs, the service releases first, then `make schema` and `yarn codegen` here, then the host.
 
