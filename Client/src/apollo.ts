@@ -83,7 +83,7 @@ function createKiclClient(
 
 let clientInstance: ApolloClient | null = null;
 
-export function getKiclClient(
+export function getClient(
   uri: string = '/api',
   wsUri?: string,
 ): ApolloClient {

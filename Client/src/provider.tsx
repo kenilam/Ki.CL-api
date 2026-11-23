@@ -3,10 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { ApolloProvider as BaseApolloProvider } from '@apollo/client/react';
 
 import { Kicl_ExchangeTokenDocument } from 'api/generated/graphql';
-import { getKiclClient } from 'api/client';
+import { getClient } from 'api/apollo';
 import { hasSession } from 'api/utils';
 
-interface KiclProviderProps {
+interface ProviderProps {
   uri?: string;
   /** WebSocket URL. Defaults to uri with http→ws. */
   wsUri?: string;
@@ -18,13 +18,13 @@ interface KiclProviderProps {
   children: React.ReactNode;
 }
 
-export function KiclProvider({
+export function Provider({
   uri = '/api',
   wsUri,
   autoExchange = true,
   children,
-}: KiclProviderProps) {
-  const client = getKiclClient(uri, wsUri);
+}: ProviderProps) {
+  const client = getClient(uri, wsUri);
   const [ready, setReady] = useState(() => !autoExchange || hasSession());
 
   useEffect(() => {

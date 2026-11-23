@@ -1,5 +1,5 @@
 {
-  "name": "ki-cl-back",
+  "name": "ki-cl-api",
   "version": "2.0.0",
   "description": "Ki.CL Backend - Apollo GraphQL API",
   "type": "module",
@@ -26,7 +26,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kenilam/Ki.CL-back.git"
+    "url": "git+https://github.com/kenilam/Ki.CL-api.git"
   },
   "devDependencies": {
     "@types/app-root-path": "^3.1.0",
