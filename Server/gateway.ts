@@ -33,7 +33,7 @@ export function create(source: string) {
           subscriptions: {
             kind: 'ws',
             headers: INVOKER,
-            options: { connectionParams: { cookie: '{context.headers.cookie}' } },
+            options: { connectionParams: { cookie: '{context.upgrade.cookie}' } },
           },
         },
       },

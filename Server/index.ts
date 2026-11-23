@@ -47,6 +47,7 @@ useServer(
   getGraphQLWSOptions<Record<string, unknown>, Extra>(runtime, (context) => ({
     req: context.extra.request,
     socket: context.extra.socket,
+    upgrade: { cookie: context.extra.request.headers.cookie ?? context.connectionParams?.cookie },
   })),
   new WebSocketServer({ server, path: runtime.graphqlEndpoint }),
 );
