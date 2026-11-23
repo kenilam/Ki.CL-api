@@ -4846,9 +4846,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ki-cl-back@workspace:.":
+"ki-cl-api@workspace:.":
   version: 0.0.0-use.local
-  resolution: "ki-cl-back@workspace:."
+  resolution: "ki-cl-api@workspace:."
   dependencies:
     "@types/app-root-path": "npm:^3.1.0"
     "@types/bcrypt": "npm:^6.0.0"

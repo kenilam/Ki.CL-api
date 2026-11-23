@@ -3,7 +3,7 @@ import { firstValueFrom, map } from 'rxjs';
 
 import { Kicl_TranslationsDocument, type Kicl_TranslationsQuery } from 'api/generated/graphql';
 import { acceptLanguage as header } from 'api/acceptLanguage';
-import { getKiclClient } from 'api/client';
+import { getClient } from 'api/apollo';
 
 type Resources = { [key: string]: string | Resources | Resources[] | string[] };
 
@@ -46,7 +46,7 @@ const contentLanguageLink = new ApolloLink((operation, forward) => {
  * `resetStore()` on sign-out would otherwise fetch every namespace again.
  */
 export async function loadTranslations(acceptLanguage: string, namespaces: string[]) {
-  const client = getKiclClient();
+  const client = getClient();
 
   const { data, extensions } = await firstValueFrom(
     ApolloLink.execute(

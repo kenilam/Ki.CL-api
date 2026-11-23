@@ -20,7 +20,8 @@ export default defineConfig({
       name: 'api',
       filename: 'remoteEntry.js',
       exposes: {
-        './provider': './src/index.ts',
+        './client': './src/index.ts',
+        './provider': './src/legacyProvider.ts',
       },
       shared: {
         react: { singleton: true, requiredVersion: '^19.0.0' },
