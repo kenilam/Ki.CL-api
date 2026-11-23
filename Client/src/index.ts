@@ -1,8 +1,8 @@
 // Entry barrel uses relative paths so emitted .d.ts stays portable for MF consumers.
 // Internal modules may still import via the `api/*` path alias (see tsconfig / vite).
 
-export { KiclProvider } from './provider';
-export { getKiclClient } from './client';
+export { Provider } from './provider';
+export { getClient } from './apollo';
 export { getSessionType, isAuthenticated, hasSession, getApiKey } from './utils';
 export { loadTranslations } from './translations';
 /*
