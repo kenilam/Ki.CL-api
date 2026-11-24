@@ -1,16 +1,23 @@
 import {
   ApolloClient,
+  CombinedGraphQLErrors,
   InMemoryCache,
   createHttpLink,
   split,
 } from '@apollo/client';
 import { SetContextLink } from '@apollo/client/link/context';
+import { ErrorLink } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
+import type { Client } from 'graphql-ws';
+import { from, mergeMap, of, throwError } from 'rxjs';
 
 import { acceptLanguage } from 'api/acceptLanguage';
+import * as renewal from 'api/renewal';
 import { createSocketClient } from 'api/socket';
 import { toWsUri } from 'api/wsUri';
+
+const EXCHANGE = 'kicl_exchangeToken';
 
 const acceptLanguageLink = new SetContextLink(({ headers }) => {
   if (typeof document === 'undefined') {
@@ -20,7 +27,32 @@ const acceptLanguageLink = new SetContextLink(({ headers }) => {
   return { headers: { 'Accept-Language': acceptLanguage(document.documentElement.lang), ...headers } };
 });
 
-function createKiclClient(
+function renewalLink(socket: Client | null) {
+  return new ErrorLink(({ error, result, operation, forward }) => {
+    const unauthenticated =
+      CombinedGraphQLErrors.is(error) &&
+      error.errors.some((graphQLError) => graphQLError.extensions?.code === 'UNAUTHENTICATED');
+
+    if (!unauthenticated || operation.operationName === EXCHANGE || operation.getContext().renewed) {
+      return;
+    }
+
+    return from(renewal.session()).pipe(
+      mergeMap((renewed) => {
+        if (!renewed) {
+          return result ? of(result) : throwError(() => error);
+        }
+
+        socket?.terminate();
+        operation.setContext({ renewed: true });
+
+        return forward(operation);
+      }),
+    );
+  });
+}
+
+function createClient(
   uri: string,
   wsUri: string,
 ): ApolloClient {
@@ -32,12 +64,10 @@ function createKiclClient(
     },
   });
 
-  const wsLink =
-    typeof window !== 'undefined'
-      ? new GraphQLWsLink(createSocketClient(wsUri))
-      : null;
+  const socket = typeof window !== 'undefined' ? createSocketClient(wsUri) : null;
+  const wsLink = socket ? new GraphQLWsLink(socket) : null;
 
-  const link =
+  const transport =
     wsLink != null
       ? split(
           ({ query }) => {
@@ -54,7 +84,7 @@ function createKiclClient(
 
   return new ApolloClient({
     enhancedClientAwareness: { transport: false },
-    link,
+    link: renewalLink(socket).concat(transport),
     cache: new InMemoryCache({
       typePolicies: {
         Query: {
@@ -88,7 +118,7 @@ export function getClient(
   wsUri?: string,
 ): ApolloClient {
   if (!clientInstance) {
-    clientInstance = createKiclClient(uri, wsUri ?? toWsUri(uri));
+    clientInstance = createClient(uri, wsUri ?? toWsUri(uri));
   }
   return clientInstance;
 }
