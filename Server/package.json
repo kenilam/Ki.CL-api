@@ -16,6 +16,7 @@
     "graphql": "17",
     "graphql-ws": "^6.2.0",
     "http-proxy-middleware": "^3.0.5",
+    "jose": "^6.2.18",
     "ws": "^8.21.1"
   }
 }

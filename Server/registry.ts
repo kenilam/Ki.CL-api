@@ -9,6 +9,7 @@ export interface ServiceRecord {
   url: string;
   sdl: string;
   mount?: string;
+  jwks?: string;
 }
 
 const FOLDER = 'services/';
@@ -36,6 +37,12 @@ async function fromDirectory(directory: string): Promise<ServiceRecord[]> {
 
 export function read(registry: string): Promise<ServiceRecord[]> {
   return isDirectory(registry) ? fromDirectory(registry) : fromBucket(registry);
+}
+
+export function jwks(records: ServiceRecord[]): string | undefined {
+  const issuer = records.find((record) => record.jwks);
+
+  return issuer?.jwks ? new URL(issuer.jwks, issuer.url).href : undefined;
 }
 
 export function compose(records: ServiceRecord[]) {

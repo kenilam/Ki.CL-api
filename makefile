@@ -63,5 +63,5 @@ CORE ?= ../Ki.CL-core
 # `PORT=3110 make run`, then this, then `make run` here.
 registry.local:
 	@mkdir -p .registry-local/services
-	@cd $(CORE) && npx tsx Server/Scripts/registry.ts sdl | jq -Rs '{name: "core", url: "http://localhost:3110/api", sdl: .}' > $(CURDIR)/.registry-local/services/core.json
+	@cd $(CORE) && npx tsx Server/Scripts/registry.ts record http://localhost:3110/api > $(CURDIR)/.registry-local/services/core.json
 	@echo "wrote .registry-local/services/core.json"

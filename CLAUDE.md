@@ -8,7 +8,7 @@ A Yarn 4 workspace repo with three workspaces: `Server` (the gateway), `Codegen`
 
 ```bash
 make run              # codegen + build Client + start the gateway (tsx watch)
-make registry.local   # point the local gateway at a local core on port 3110 (run core with PORT=3110 make run)
+make registry.local   # write a local registry record for a local core on port 3110 (run core with PORT=3110 make run)
 make schema           # write Codegen/schema.graphql from the production registry (REGISTRY=ki-cl-registry-dev for dev)
 yarn codegen          # regenerate Client/src/operations.graphql and Client/src/generated from Codegen/schema.graphql
 yarn build            # codegen + tsc --noEmit
@@ -22,6 +22,7 @@ Ki.CL-api is the gateway in front of the site's GraphQL services, and it serves 
 - `Server/gateway.ts` runs Hive Gateway at `/api`, over HTTP and WebSocket. Every 30 seconds it reads the service records from the registry (`REGISTRY`: a bucket name, or a directory locally) and composes them with `@theguild/federation-composition` (`Server/registry.ts`). A record that won't parse or compose is logged, and the last good supergraph stays in place. A service never needs a gateway release.
 - The visitor's `cookie`, `accept-language`, `origin`, `authorization` and `x-turnstile-token` go to every service. `set-cookie` comes back from every service, and `content-language` from core.
 - Subscriptions reach a service over WebSocket with the visitor's cookie in `connectionParams`, which is one upstream socket per visitor.
+- The gateway checks the visitor's access token from their cookie (`Server/visitor.ts`), against the JWKS of the service whose registry record has a `jwks` path, which is core for now. Every root field needs a session unless the service that owns it marks it `@public`, and a field marked `@requiresScopes(scopes: [["human"]])` also needs the session's `human` flag, or it answers `CAPTCHA_REQUIRED`. Hive's `genericAuth` applies the marks, and only on root fields; the fields under them follow their root. A missing, expired or forged token counts as no session, so the client renews it.
 - A service's bare 401 becomes an `UNAUTHENTICATED` GraphQL error, so the client sees a code rather than an unexpected error.
 - Services only take internal traffic and require an invoker. On Cloud Run, `Server/invoker.ts` mints an ID token for the shared audience `ki-cl-subgraphs` and every call carries it in `X-Serverless-Authorization`, which is the gateway proving who it is to Cloud Run. The visitor's own credentials stay in their cookie.
 - `/api/session` and `/assets/*` pass straight through to core (`Server/passthrough.ts`).

@@ -5147,6 +5147,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"jose@npm:^6.2.18":
+  version: 6.2.18
+  resolution: "jose@npm:6.2.18"
+  checksum: 10c0/95144c43dfa0c8206f13f8133ed74ba9106785df81c864d6399af06616ad8fdbdc18937109aac099f560f6159aaf2fe2fca3984a6629c899af396a1e9986008d
+  languageName: node
+  linkType: hard
+
 "js-md5@npm:0.8.3":
   version: 0.8.3
   resolution: "js-md5@npm:0.8.3"
@@ -6353,6 +6360,7 @@ __metadata:
     graphql: "npm:17"
     graphql-ws: "npm:^6.2.0"
     http-proxy-middleware: "npm:^3.0.5"
+    jose: "npm:^6.2.18"
     ws: "npm:^8.21.1"
   languageName: unknown
   linkType: soft
