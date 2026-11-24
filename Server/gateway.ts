@@ -1,7 +1,9 @@
 import { createGatewayRuntime, type GatewayPlugin } from '@graphql-hive/gateway-runtime';
+import { GraphQLError } from 'graphql';
 
 import * as invoker from './invoker.js';
 import * as registry from './registry.js';
+import * as visitor from './visitor.js';
 
 const FORWARDED = ['cookie', 'accept-language', 'origin', 'authorization', 'x-turnstile-token'];
 const INVOKER = [['x-serverless-authorization', '{context.invoker.authorization}']] as [string, string][];
@@ -23,6 +25,7 @@ export function create(source: string) {
       const { supergraphSdl } = registry.compose(records);
 
       services = records;
+      visitor.trust(registry.jwks(records));
 
       return supergraphSdl;
     },
@@ -36,6 +39,29 @@ export function create(source: string) {
             options: { connectionParams: { cookie: '{context.upgrade.cookie}' } },
           },
         },
+      },
+    },
+    genericAuth: {
+      mode: 'protect-all',
+      authDirectiveName: 'public',
+      resolveUserFn: (context) =>
+        visitor.read((context as { upgrade?: { cookie?: string } }).upgrade?.cookie ?? context.request?.headers.get('cookie')),
+      extractScopes: (user) => (user?.human ? ['human'] : []),
+      validateUser: ({ user, parentType, fieldDirectives, fieldScopes, userScopes, executionArgs }) => {
+        const { schema } = executionArgs;
+        const roots = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()];
+
+        if (!roots.includes(parentType as never) || fieldDirectives?.public) {
+          return;
+        }
+
+        if (!user) {
+          return new GraphQLError('Unauthorized', { extensions: { code: 'UNAUTHENTICATED' } });
+        }
+
+        if (fieldScopes && !fieldScopes.some((scopes) => scopes.every((scope) => userScopes.includes(scope)))) {
+          return new GraphQLError('Human check required', { extensions: { code: 'CAPTCHA_REQUIRED' } });
+        }
       },
     },
     propagateHeaders: {
