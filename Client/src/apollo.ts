@@ -17,7 +17,12 @@ import * as renewal from 'api/renewal';
 import { createSocketClient } from 'api/socket';
 import { toWsUri } from 'api/wsUri';
 
-const EXCHANGE = 'kicl_exchangeToken';
+const RENEWALS: Record<string, (uri: string) => Promise<boolean>> = {
+  EXPIRED: (uri) => renewal.refresh(uri).then((refreshed) => refreshed || renewal.session()),
+  UNAUTHORIZED: () => renewal.session(),
+  CAPTCHA_REQUIRED: () => renewal.session(),
+  UNAUTHENTICATED: () => renewal.session(),
+};
 
 const acceptLanguageLink = new SetContextLink(({ headers }) => {
   if (typeof document === 'undefined') {
@@ -27,17 +32,19 @@ const acceptLanguageLink = new SetContextLink(({ headers }) => {
   return { headers: { 'Accept-Language': acceptLanguage(document.documentElement.lang), ...headers } };
 });
 
-function renewalLink(socket: Client | null) {
+function renewalLink(uri: string, socket: Client | null) {
   return new ErrorLink(({ error, result, operation, forward }) => {
-    const unauthenticated =
-      CombinedGraphQLErrors.is(error) &&
-      error.errors.some((graphQLError) => graphQLError.extensions?.code === 'UNAUTHENTICATED');
+    const renew = CombinedGraphQLErrors.is(error)
+      ? error.errors
+          .map((graphQLError) => RENEWALS[String(graphQLError.extensions?.code)])
+          .find(Boolean)
+      : undefined;
 
-    if (!unauthenticated || operation.operationName === EXCHANGE || operation.getContext().renewed) {
+    if (!renew || operation.getContext().renewed) {
       return;
     }
 
-    return from(renewal.session()).pipe(
+    return from(renew(uri)).pipe(
       mergeMap((renewed) => {
         if (!renewed) {
           return result ? of(result) : throwError(() => error);
@@ -84,7 +91,7 @@ function createClient(
 
   return new ApolloClient({
     enhancedClientAwareness: { transport: false },
-    link: renewalLink(socket).concat(transport),
+    link: renewalLink(uri, socket).concat(transport),
     cache: new InMemoryCache({
       typePolicies: {
         Query: {

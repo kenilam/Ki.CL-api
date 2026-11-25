@@ -39,12 +39,6 @@ export function read(registry: string): Promise<ServiceRecord[]> {
   return isDirectory(registry) ? fromDirectory(registry) : fromBucket(registry);
 }
 
-export function jwks(records: ServiceRecord[]): string | undefined {
-  const issuer = records.find((record) => record.jwks);
-
-  return issuer?.jwks ? new URL(issuer.jwks, issuer.url).href : undefined;
-}
-
 export function compose(records: ServiceRecord[]) {
   const result = composeServices(
     records.map((record) => ({ name: record.name, url: record.url, typeDefs: parse(record.sdl) })),
