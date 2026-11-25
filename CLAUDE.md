@@ -32,6 +32,7 @@ Ki.CL-api is the gateway in front of the site's GraphQL services, and it serves 
 - A service's bare 401 becomes an `UNAUTHENTICATED` GraphQL error, so the client sees a code rather than an unexpected error.
 - Services only take internal traffic and require an invoker. On Cloud Run, `Server/invoker.ts` mints an ID token for the shared audience `ki-cl-subgraphs` and every call carries it in `X-Serverless-Authorization`, which is the gateway proving who it is to Cloud Run. The visitor's own credentials stay in their cookie.
 - `/api/session` runs `Server/admission.ts` for clients that don't use GraphQL and answers `{ changed }`, or `{ error, code }` with 401 or 403. `/assets/*` passes straight through to core (`Server/passthrough.ts`).
+- `cloudbuild.yaml` builds and deploys the gateway, for the `ki-cl-api-develop` and `ki-cl-api-main` triggers. It stops before deploying if the service grants `allUsers` or `allAuthenticatedUsers`, since only the host may reach the gateway.
 - Hive builds its schema on the first request, so `Server/index.ts` sends itself one query before it listens; otherwise a subscription arriving first fails.
 
 ## Client

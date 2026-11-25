@@ -1,0 +1,49 @@
+steps:
+  - id: Build
+    name: gcr.io/cloud-builders/docker
+    args: ['build', '--no-cache', '-t', '$_IMAGE', '.', '-f', 'Dockerfile']
+
+  - id: Push
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '$_IMAGE']
+
+  # Only the host may reach the gateway, so it stays private behind Cloud Run's invoker check.
+  - id: Private
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if gcloud run services get-iam-policy $_SERVICE_NAME --region=$_DEPLOY_REGION --format='value(bindings.members)' | grep -qE 'allUsers|allAuthenticatedUsers'; then
+          echo "$_SERVICE_NAME lets anyone invoke it. Remove allUsers and allAuthenticatedUsers before deploying."
+          exit 1
+        fi
+
+  - id: Deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - --platform=managed
+      - --image=$_IMAGE
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID
+      - --region=$_DEPLOY_REGION
+      - --quiet
+
+substitutions:
+  _AR_HOSTNAME: us-central1-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _DEPLOY_REGION: us-central1
+  _SERVICE_NAME: ki-cl-api-dev
+  _IMAGE: ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/ki.cl-api/${_SERVICE_NAME}:${COMMIT_SHA}
+
+options:
+  dynamicSubstitutions: true
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - $_IMAGE
