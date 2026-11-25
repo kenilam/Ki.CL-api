@@ -114,7 +114,8 @@ export function create(source: string) {
           extendContext({ invoker: { authorization: invoker.authorization() } });
         },
         onParams: async ({ params, request, setResult }) => {
-          if (admission.whiteListed(params.query, params.operationName)) {
+          // An operation on a WebSocket has no request: the socket is checked per field, from its upgrade cookie.
+          if (!request || admission.whiteListed(params.query, params.operationName)) {
             return;
           }
 
