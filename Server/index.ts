@@ -6,10 +6,14 @@ import { useServer, type Extra } from 'graphql-ws/use/ws';
 import { WebSocketServer } from 'ws';
 import { getGraphQLWSOptions } from '@graphql-hive/gateway-runtime';
 
+import * as admission from './admission.js';
+import * as cookies from './cookies.js';
 import * as gateway from './gateway.js';
 import * as invoker from './invoker.js';
 import { precompressed } from './Middleware/precompressed.js';
 import * as passthrough from './passthrough.js';
+import * as sessions from './sessions.js';
+import * as turnstile from './turnstile.js';
 
 const PORT = Number(process.env.PORT) || 3100;
 const REGISTRY = process.env.REGISTRY ?? (process.env.NODE_ENV === 'development' ? './.registry-local' : undefined);
@@ -40,6 +44,20 @@ app.get('/client/@mf-types.zip', (_req, res) => {
   res.sendFile(`${CLIENT}/types.zip`);
 });
 
+app.post('/api/session', async (req, res) => {
+  const result = await admission.admit(req.headers.cookie, req.get(turnstile.HEADER) ?? null);
+
+  if (!result.ok) {
+    res
+      .append('Set-Cookie', result.clear ? cookies.clear() : [])
+      .status(result.status)
+      .json({ error: result.message, code: result.code });
+    return;
+  }
+
+  res.append('Set-Cookie', result.setCookies).json({ changed: result.issued });
+});
+
 app.use(passthrough.toCore);
 app.use(runtime.graphqlEndpoint, runtime);
 
@@ -52,11 +70,12 @@ useServer(
   new WebSocketServer({ server, path: runtime.graphqlEndpoint }),
 );
 
+await sessions.connect();
 await invoker.start();
 await runtime.fetch('http://localhost/api', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ query: '{ __typename }' }),
+  body: JSON.stringify({ query: 'query kicl_warmup { __typename }' }),
 });
 
 server.listen(PORT, () => {
