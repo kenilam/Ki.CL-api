@@ -17,9 +17,6 @@ import * as renewal from 'api/renewal';
 import { createSocketClient } from 'api/socket';
 import { toWsUri } from 'api/wsUri';
 
-/** The host's session gate until it moves to `/api/session`; it handles its own refusals. */
-const EXCHANGE = 'kicl_exchangeToken';
-
 const RENEWALS: Record<string, (uri: string) => Promise<boolean>> = {
   EXPIRED: (uri) => renewal.refresh(uri).then((refreshed) => refreshed || renewal.session()),
   UNAUTHORIZED: () => renewal.session(),
@@ -43,7 +40,7 @@ function renewalLink(uri: string, socket: Client | null) {
           .find(Boolean)
       : undefined;
 
-    if (!renew || operation.operationName === EXCHANGE || operation.getContext().renewed) {
+    if (!renew || operation.getContext().renewed) {
       return;
     }
 

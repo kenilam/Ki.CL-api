@@ -1196,10 +1196,6 @@ mutation kicl_deleteMe($deleteMe: DeleteMeInput!) {
   deleteMe(deleteMe: $deleteMe)
 }
 
-mutation kicl_exchangeToken {
-  exchangeToken
-}
-
 mutation kicl_imageAgentSend($threadId: ID, $text: String!) {
   imageAgentSend(threadId: $threadId, text: $text) {
     id
