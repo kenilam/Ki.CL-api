@@ -1,3 +1,5 @@
+directive @public on FIELD_DEFINITION
+
 scalar DateTime
 
 scalar EmailAddress
@@ -15,13 +17,12 @@ scalar AcceptLanguage
 scalar JSONObject
 
 type Mutation {
-  activate(activate: ActivateInput!): Boolean
+  activate(activate: ActivateInput!): Boolean @public
   """
   Sends a message to the site's owner and acknowledges it at the sender's address. Needs a session that passed the Turnstile check.
   """
   contact(contact: ContactInput!): Boolean
   deleteMe(deleteMe: DeleteMeInput!): Boolean
-  exchangeToken: Boolean
   """
   Say something to the agent. Starts a conversation when `threadId` is not
   given. Returns as soon as the message is recorded; the reply arrives on
@@ -66,11 +67,11 @@ type Mutation {
   Sets the password kept with the request, once it has been confirmed.
   """
   passwordChangeComplete(passwordChangeComplete: PasswordChangeCompleteInput!): Boolean
-  refreshToken: Boolean
-  register(register: RegisterInput!): Boolean
-  signIn(signIn: SignInInput!): Boolean
+  refreshToken: Boolean @public
+  register(register: RegisterInput!): Boolean @public
+  signIn(signIn: SignInInput!): Boolean @public
   signOut: Boolean
-  socialSignIn(socialSignIn: SocialSignInInput!): Boolean
+  socialSignIn(socialSignIn: SocialSignInInput!): Boolean @public
   """
   Starts a swatch from a picture: a model finds the colour that defines it and
   makes a new photograph in that colour. Answers at once with the swatch as
@@ -196,7 +197,7 @@ type Query {
   Runs without a session: the site needs its words before it can start one,
   and they are public.
   """
-  translations(namespaces: [String!]!): [Translation!]!
+  translations(namespaces: [String!]!): [Translation!]! @public
   """
   Subtree from Open Tree of Life (cached in Mongo).
   `ottId` defaults to 93302 (cellular organisms). `heightLimit` max 3.
