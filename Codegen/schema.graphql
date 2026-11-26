@@ -12,8 +12,6 @@ scalar URL
 
 scalar NonEmptyString
 
-scalar AcceptLanguage
-
 scalar JSONObject
 
 type Mutation {
@@ -52,10 +50,6 @@ type Mutation {
   """
   kineticLightArrange(id: ID!, outline: KineticLightOutline!): KineticLightReading!
   """
-  Takes the caller's notifications out of their list, and returns their ids.
-  """
-  notificationsDismiss(ids: [ID!]!): [ID!]!
-  """
   Checks the current password, keeps the new one hashed, and emails the signed-in user a link to confirm the change.
   """
   passwordChangeRequest(passwordChangeRequest: PasswordChangeRequestInput!): PasswordChange!
@@ -86,6 +80,14 @@ type Mutation {
   """
   swatchPick(hex: String!): Swatch!
   updateMe(updateMe: UpdateMeInput!): Boolean
+  """
+  Takes notifications out of the caller's list. Answers the ids it took out.
+  """
+  notificationsDismiss(ids: [ID!]!): [ID!]!
+  """
+  Starts a short pretend job for the caller, whose steps arrive like real work.
+  """
+  notificationsDemo: Boolean!
 }
 
 type Asset {
@@ -145,10 +147,6 @@ type Query {
   """
   mentorship: Mentorship
   """
-  The caller's notifications that haven't been dismissed, newest first.
-  """
-  notifications: [Notification!]!
-  """
   The signed-in user's request that is still waiting or confirmed, so a reloaded page can pick it up.
   """
   passwordChange: PasswordChange
@@ -190,15 +188,6 @@ type Query {
   taxonSearch(query: String!, limit: Int = 10): [TaxonSearchResult!]!
   taxonVisual(ottId: Int!, name: String!, rank: String): TaxonVisual!
   """
-  Every string of the namespaces asked for. Each comes from the first language
-  that has it: the request's Accept-Language header in its q order, then
-  `en-US`. A namespace that doesn't exist adds nothing to the answer.
-  
-  Runs without a session: the site needs its words before it can start one,
-  and they are public.
-  """
-  translations(namespaces: [String!]!): [Translation!]! @public
-  """
   Subtree from Open Tree of Life (cached in Mongo).
   `ottId` defaults to 93302 (cellular organisms). `heightLimit` max 3.
   Warm Mongo rows skip OTOL (known leaf or existing child edges).
@@ -211,6 +200,20 @@ type Query {
   Max 16 ids combined. Uses Mongo DataLoader batching + warm-path.
   """
   treeOfLifeSubtrees(ottIds: [Int!], nodeIds: [String!], heightLimit: Int = 3): [TreeOfLifeNode]!
+  """
+  Every string of the namespaces asked for. Each comes from the first language
+  that has it: the request's Accept-Language header in its q order, matched
+  among the complete languages, then `en-US`. The response names the languages
+  in Content-Language.
+  
+  Runs without a session: the site needs its words before it can start one,
+  and they are public.
+  """
+  i18nTranslations(namespaces: [String!]!): [I18nTranslation!]! @public
+  """
+  The caller's notifications they haven't dismissed, newest first.
+  """
+  notifications: [Notification!]!
 }
 
 """
@@ -296,10 +299,6 @@ type Subscription {
   """
   kineticLightReadingUpdated: KineticLightReading!
   """
-  Pushes each of the caller's notifications when it's written or dismissed.
-  """
-  notificationUpdated: Notification!
-  """
   The request's status now and on every change, until it is confirmed or expires.
   """
   passwordChangeUpdated(id: ID!): PasswordChange!
@@ -314,7 +313,11 @@ type Subscription {
   """
   Every language's status now, and again whenever one changes.
   """
-  acceptLanguagesUpdated: [AcceptLanguageStatus!]!
+  i18nAcceptLanguagesUpdated: [I18nAcceptLanguageStatus!]!
+  """
+  Each of the caller's notifications as it changes.
+  """
+  notificationsUpdated: Notification!
 }
 
 """
@@ -509,32 +512,6 @@ type Mentorship {
   fetchedAt: DateTime!
 }
 
-"""
-Words translated where they're shown: an i18next key in the host's `common`
-namespace, or `api:` and a key in the API's, with the values it takes.
-"""
-type NotificationText {
-  key: String!
-  values: JSONObject!
-}
-
-"""
-Work that carries on after its page is left: a sheet reading, an image agent
-turn, a Tree of Life plate or a password change. There is one for each record
-a visitor is told about, written again at each step. The site links it from
-`collection`, the record's Mongo collection, and `documentId`.
-"""
-type Notification {
-  id: ID!
-  collection: String!
-  documentId: String!
-  title: NotificationText!
-  message: NotificationText!
-  dismissedAt: DateTime
-  createdAt: DateTime!
-  updatedAt: DateTime!
-}
-
 type PasswordChange {
   id: ID!
   status: PasswordChangeStatus!
@@ -674,33 +651,6 @@ type TaxonVisual {
 }
 
 """
-One string of the site's writing.
-"""
-type Translation {
-  namespace: String!
-  """
-  The string's path in its namespace, joined with dots: `account.signOut`.
-  """
-  field: String!
-  value: String!
-}
-
-"""
-Whether a language can be shown yet.
-"""
-type AcceptLanguageStatus {
-  acceptLanguage: AcceptLanguage!
-  """
-  Every `en-US` string is in this language. Only a complete language can be picked or answered in.
-  """
-  complete: Boolean!
-  """
-  `make translations.translate` is working on this language now.
-  """
-  translating: Boolean!
-}
-
-"""
 Flat OTOL + studio node. Tree edges are nodeId-only, parent-pointer style:
 `ancestor` ← the node's own ancestorNodeId (shallow stitch by DataLoader),
 `descendants` ← a live reverse lookup (`{ ancestorNodeId: nodeId }`, batched).
@@ -732,6 +682,68 @@ type TreeOfLifeNode {
   Studio vision QA for the current asset, when generated.
   """
   visualScore: TaxonVisualScore
+}
+
+"""
+One string of the site's writing, in one language.
+"""
+type I18nTranslation {
+  """
+  `<accept-language>:<namespace>:<field>`.
+  """
+  id: ID!
+  namespace: String!
+  """
+  The string's path in its namespace, joined with dots: `account.signOut`.
+  """
+  field: String!
+  value: String!
+}
+
+"""
+Whether a language can be shown yet.
+"""
+type I18nAcceptLanguageStatus {
+  """
+  The language's BCP 47 tag.
+  """
+  id: ID!
+  acceptLanguage: String!
+  """
+  Every `en-US` string is in this language. Only a complete language can be picked or answered in.
+  """
+  complete: Boolean!
+  """
+  A translate run is working on this language now.
+  """
+  translating: Boolean!
+}
+
+"""
+Words in the sender's i18next namespace: a key and the values it takes. The
+bell translates them in the visitor's language.
+"""
+type NotificationText {
+  key: String!
+  values: JSONObject!
+}
+
+"""
+One visitor's row for one source: work that carries on after its page is left.
+The sender describes it: where it links, how it looks and whether it runs.
+"""
+type Notification {
+  id: ID!
+  source: String!
+  path: String!
+  level: NotificationLevel!
+  running: Boolean!
+  namespace: String!
+  title: NotificationText!
+  message: NotificationText!
+  dismissedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
 enum ImageAgentRole {
@@ -934,6 +946,14 @@ true.
 enum TaxonVisualExhaustion {
   REFILLS
   BILLING
+}
+
+enum NotificationLevel {
+  NEUTRAL
+  CONFIRM
+  ERROR
+  INFO
+  WARNING
 }
 
 input ActivateInput {

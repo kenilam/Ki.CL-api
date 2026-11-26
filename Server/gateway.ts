@@ -8,9 +8,6 @@ import * as registry from './registry.js';
 import * as tokens from './tokens.js';
 import * as turnstile from './turnstile.js';
 
-// The services that answer with the language of the words they return. Core leaves once the host reads its words from i18n.
-const LANGUAGE_SERVICES = new Set(['i18n', 'core']);
-
 const FORWARDED = ['cookie', 'accept-language', 'origin', 'authorization'];
 const INVOKER = [['x-serverless-authorization', '{context.invoker.authorization}']] as [string, string][];
 const OPERATION_PREFIX = 'kicl_';
@@ -108,7 +105,7 @@ export function create(source: string) {
       }),
       fromSubgraphsToClient: ({ response, subgraphName }) => ({
         'set-cookie': response.headers.getSetCookie(),
-        ...(LANGUAGE_SERVICES.has(subgraphName) ? { 'content-language': response.headers.get('content-language') ?? undefined } : {}),
+        ...(subgraphName === 'i18n' ? { 'content-language': response.headers.get('content-language') ?? undefined } : {}),
       }),
     },
     plugins: (): GatewayPlugin[] => [

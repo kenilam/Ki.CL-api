@@ -298,25 +298,6 @@ query kicl_mentorship {
   }
 }
 
-query kicl_notifications {
-  notifications {
-    id
-    collection
-    documentId
-    title {
-      key
-      values
-    }
-    message {
-      key
-      values
-    }
-    dismissedAt
-    createdAt
-    updatedAt
-  }
-}
-
 query kicl_passwordChange {
   passwordChange {
     id
@@ -491,14 +472,6 @@ query kicl_taxonVisual($ottId: Int!, $name: String!, $rank: String) {
       pass
     }
     exhaustion
-  }
-}
-
-query kicl_translations($namespaces: [String!]!) {
-  translations(namespaces: $namespaces) {
-    namespace
-    field
-    value
   }
 }
 
@@ -1184,6 +1157,37 @@ query kicl_treeOfLifeSubtrees($ottIds: [Int!], $nodeIds: [String!], $heightLimit
   }
 }
 
+query kicl_i18nTranslations($namespaces: [String!]!) {
+  i18nTranslations(namespaces: $namespaces) {
+    id
+    namespace
+    field
+    value
+  }
+}
+
+query kicl_notifications {
+  notifications {
+    id
+    source
+    path
+    level
+    running
+    namespace
+    title {
+      key
+      values
+    }
+    message {
+      key
+      values
+    }
+    dismissedAt
+    createdAt
+    updatedAt
+  }
+}
+
 mutation kicl_activate($activate: ActivateInput!) {
   activate(activate: $activate)
 }
@@ -1402,10 +1406,6 @@ mutation kicl_kineticLightArrange($id: ID!, $outline: KineticLightOutline!) {
   }
 }
 
-mutation kicl_notificationsDismiss($ids: [ID!]!) {
-  notificationsDismiss(ids: $ids)
-}
-
 mutation kicl_passwordChangeRequest($passwordChangeRequest: PasswordChangeRequestInput!) {
   passwordChangeRequest(passwordChangeRequest: $passwordChangeRequest) {
     id
@@ -1498,6 +1498,14 @@ mutation kicl_updateMe($updateMe: UpdateMeInput!) {
   updateMe(updateMe: $updateMe)
 }
 
+mutation kicl_notificationsDismiss($ids: [ID!]!) {
+  notificationsDismiss(ids: $ids)
+}
+
+mutation kicl_notificationsDemo {
+  notificationsDemo
+}
+
 subscription kicl_imageAgentThreadUpdated($id: ID!) {
   imageAgentThreadUpdated(id: $id) {
     id
@@ -1573,25 +1581,6 @@ subscription kicl_kineticLightReadingUpdated {
   }
 }
 
-subscription kicl_notificationUpdated {
-  notificationUpdated {
-    id
-    collection
-    documentId
-    title {
-      key
-      values
-    }
-    message {
-      key
-      values
-    }
-    dismissedAt
-    createdAt
-    updatedAt
-  }
-}
-
 subscription kicl_passwordChangeUpdated($id: ID!) {
   passwordChangeUpdated(id: $id) {
     id
@@ -1642,10 +1631,33 @@ subscription kicl_taxonVisualUpdated($ottId: Int!) {
   }
 }
 
-subscription kicl_acceptLanguagesUpdated {
-  acceptLanguagesUpdated {
+subscription kicl_i18nAcceptLanguagesUpdated {
+  i18nAcceptLanguagesUpdated {
+    id
     acceptLanguage
     complete
     translating
+  }
+}
+
+subscription kicl_notificationsUpdated {
+  notificationsUpdated {
+    id
+    source
+    path
+    level
+    running
+    namespace
+    title {
+      key
+      values
+    }
+    message {
+      key
+      values
+    }
+    dismissedAt
+    createdAt
+    updatedAt
   }
 }

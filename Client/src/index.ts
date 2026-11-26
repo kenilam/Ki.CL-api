@@ -5,7 +5,6 @@ export { Provider } from './provider';
 export { getClient } from './apollo';
 export { onUnauthenticated } from './renewal';
 export { getSessionType, isAuthenticated, hasSession, getApiKey } from './utils';
-export { loadTranslations } from './translations';
 /*
  * Typed documents, not generated hooks.
  *
