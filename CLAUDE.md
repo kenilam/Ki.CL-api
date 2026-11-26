@@ -43,7 +43,7 @@ The documents are generated from `Codegen/schema.graphql`, the gateway's public 
 
 ## Omr
 
-`Omr/` is Kinetic Light's sheet reader, a separate Python service around homr (AGPL-3.0, so it stays its own program), deployed by its own triggers. Core calls it at `KINETIC_LIGHT_OMR_URL`. It moves with Kinetic Light.
+`Omr/` is Kinetic Light's sheet reader, a separate Python service around homr (AGPL-3.0, so it stays its own program), deployed by its own triggers from `Omr/cloudbuild.yaml` when a file under `Omr/` changes. Only core may call it, so the build stops before deploying if the service grants `allUsers` or `allAuthenticatedUsers`. Core calls it at `KINETIC_LIGHT_OMR_URL`. It moves with Kinetic Light.
 
 ## Writing
 
