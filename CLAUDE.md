@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+How code is written follows "Code" in `Ki.CL/CLAUDE.md`.
+
 ## Commands
 
 A Yarn 4 workspace repo with three workspaces: `Server` (the gateway), `Codegen` and `Client`. Node >=24.
