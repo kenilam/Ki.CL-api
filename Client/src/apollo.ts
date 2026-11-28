@@ -5,14 +5,13 @@ import {
   createHttpLink,
   split,
 } from '@apollo/client';
-import { SetContextLink } from '@apollo/client/link/context';
 import { ErrorLink } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import type { Client } from 'graphql-ws';
 import { from, mergeMap, of, throwError } from 'rxjs';
 
-import { acceptLanguage } from 'api/acceptLanguage';
+import * as language from 'api/language';
 import * as renewal from 'api/renewal';
 import { createSocketClient } from 'api/socket';
 import { toWsUri } from 'api/wsUri';
@@ -23,14 +22,6 @@ const RENEWALS: Record<string, (uri: string) => Promise<boolean>> = {
   CAPTCHA_REQUIRED: () => renewal.session(),
   UNAUTHENTICATED: () => renewal.session(),
 };
-
-const acceptLanguageLink = new SetContextLink(({ headers }) => {
-  if (typeof document === 'undefined') {
-    return {};
-  }
-
-  return { headers: { 'Accept-Language': acceptLanguage(document.documentElement.lang), ...headers } };
-});
 
 function renewalLink(uri: string, socket: Client | null) {
   return new ErrorLink(({ error, result, operation, forward }) => {
@@ -85,11 +76,11 @@ function createClient(
             );
           },
           wsLink,
-          acceptLanguageLink.concat(httpLink),
+          language.link.concat(httpLink),
         )
-      : acceptLanguageLink.concat(httpLink);
+      : language.link.concat(httpLink);
 
-  return new ApolloClient({
+  const client = new ApolloClient({
     enhancedClientAwareness: { transport: false },
     link: renewalLink(uri, socket).concat(transport),
     cache: new InMemoryCache({
@@ -116,6 +107,10 @@ function createClient(
       },
     },
   });
+
+  language.follow(client);
+
+  return client;
 }
 
 let clientInstance: ApolloClient | null = null;
